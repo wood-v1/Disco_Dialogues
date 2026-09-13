@@ -1,6 +1,5 @@
 #include "dialog_feed.h"
 #include "hd_hooks.h"
-#include "dialog_audio.h"
 
 namespace disco_dialogues {
 namespace {
@@ -11,11 +10,6 @@ ExecuteFn originalExecute = nullptr;
 // text wrapping/localisation and limit just this draw call to one feed viewport.
 // The full window rectangle is restored before input dispatch or any other draw.
 bool __fastcall Execute(void* context, void*, const char* name, void** args, unsigned count, void* result) {
-    if (name && std::strcmp(name, "DiscoDialoguesChoiceSound") == 0) {
-        if (count != 0) return false;
-        PlayDialogChoiceSound();
-        return true;
-    }
     if (!name || std::strcmp(name, "DiscoDialoguesPrint") != 0)
         return originalExecute(context, name, args, count, result);
     if (count != 11) return false;

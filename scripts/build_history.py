@@ -2,14 +2,14 @@
 import argparse
 from pathlib import Path
 import sys
-from generate_layouts import ROOT, DEFAULT_GAME, read_vfs
+from generate_layouts import ROOT, read_vfs
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--compiler-root', type=Path, required=True)
     parser.add_argument('--pathologic-re', type=Path, required=True)
-    parser.add_argument('--game-root', type=Path, default=DEFAULT_GAME)
+    parser.add_argument('--game-root', type=Path, required=True)
     args = parser.parse_args()
     sys.path.insert(0, str(args.compiler_root.resolve()))
     import compiler
@@ -48,7 +48,6 @@ def main():
             raise ValueError('HD presentation contract not verified: ' + signature)
     # Our scoped HD draw bridge, implemented in src/dialog_feed.cpp.
     NATIVE_FUNCTION_ARITIES['DiscoDialoguesPrint'] = (11,)
-    NATIVE_FUNCTION_ARITIES['DiscoDialoguesChoiceSound'] = (0,)
     api = compiler.load_assembler_api(args.pathologic_re)
     compiled = {}
     for component, events in {'feed': [0, 1, 2, 3, 8, 10, 15, 101, 102, 200],

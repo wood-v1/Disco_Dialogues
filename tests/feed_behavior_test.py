@@ -142,9 +142,9 @@ class Feed:
         elif name == 'GetAnswer':
             for i, value in enumerate(self.replies[get(0)], 1): out(i, value)
         elif name == 'SelectAnswer':
-            assert self.native_calls[-2] == 'DiscoDialoguesChoiceSound'
+            assert self.native_calls[-2] == 'PlaySound'
             self.chosen.append((get(0), get(1)))
-        elif name == 'DiscoDialoguesChoiceSound': pass
+        elif name == 'PlaySound': assert len(args) == 1 and get(0) == 'disco-dialogs-action'
         elif name == 'GetTextHeightInWidth':
             out(0, max(1, math.ceil(len(get(3)) * 9 / get(2))) * 20)
         elif name in ('DiscoDialoguesPrint', 'PrintInWidth'):
@@ -216,8 +216,8 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
                 assert marker == ('feed_thumb', width-14, 0 if scroll == 0 else viewport-size, 12, size)
 
     # The same IDs must be chosen by a numbered option and a mouse click.
-    replies = [('', 999, 999)] + [(f'Choice {i}', 80+i, 90+i) for i in range(4)]
-    for index in range(4):
+    replies = [('', 999, 999)] + [(f'Choice {i}', 80+i, 90+i) for i in range(5)]
+    for index in range(5):
         keyboard = Feed(width, height, replies=replies)
         mouse = Feed(width, height, replies=replies)
         assert keyboard.state['answers'][index].startswith(f'{index+1}. ')
@@ -225,8 +225,8 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
         y = mouse.state['answerTop'] + sum(mouse.state['answerHeights'][:index]) + index*5 + 1
         mouse.call('OnLButtonUp', 20, y)
         assert keyboard.chosen == mouse.chosen == [(80+index, 90+index)]
-        assert keyboard.native_calls.count('DiscoDialoguesChoiceSound') == 1
-        assert mouse.native_calls.count('DiscoDialoguesChoiceSound') == 1
+        assert keyboard.native_calls.count('PlaySound') == 1
+        assert mouse.native_calls.count('PlaySound') == 1
         keyboard.call('OnUpdate', 0.016)
         keyboard.call('OnKeyDown', 49+index)  # repeat after pending has cleared
         assert len(keyboard.chosen) == 1
@@ -236,17 +236,17 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
 
     for replies in [[], [('', 1, 2)], [('Only one', 1, 2)], [('One', 1, 2), ('Two', 3, 4)]]:
         limited = Feed(width, height, replies=replies)
-        for key in (51, 52, 201, 202):  # binding IDs are NOT UI virtual keys
+        for key in (51, 52, 53, 201, 202):  # binding IDs are NOT UI virtual keys
             limited.call('OnKeyDown', key)
         assert not limited.chosen
-        assert 'DiscoDialoguesChoiceSound' not in limited.native_calls
+        assert 'PlaySound' not in limited.native_calls
     stale = Feed(width, height)
     stale.call('OnMouseMove', 20, stale.state['answerTop']+1)
     stale.replies = []
     stale.call('OnKeyUp', 256)
     stale.call('OnKeyDown', 49)
     assert not stale.chosen
-    assert 'DiscoDialoguesChoiceSound' not in stale.native_calls
+    assert 'PlaySound' not in stale.native_calls
     stale.state['conversation'] = None
     stale.call('ChooseNumber', 0)
     assert not stale.chosen
@@ -260,10 +260,10 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
                                         'historyScroll', 'answerScroll', 'selected')}
     info.call('OnUIMessage', 4101, 'unrelated', None)
     assert info.state['viewMode'] == 0
-    assert info.native_calls.count('DiscoDialoguesChoiceSound') == 1
+    assert info.native_calls.count('PlaySound') == 1
     info.call('OnUIMessage', 4101, 'photo', None)
     assert info.state['viewMode'] == 1 and info.state['infoMax'] > 0
-    assert info.native_calls.count('DiscoDialoguesChoiceSound') == 2
+    assert info.native_calls.count('PlaySound') == 2
     info.draws.clear()
     info.call('OnDraw')
     assert len(info.draws) == 1
@@ -276,15 +276,15 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
     info.call('OnMouseMove', width-5, height-1)
     info.call('OnLButtonUp', width-5, height-1)
     assert info.state['dragging'] == 0 and 0 <= info.state['infoScroll'] <= info.state['infoMax']
-    for key in range(49, 53): info.call('OnKeyDown', key)
+    for key in range(49, 54): info.call('OnKeyDown', key)
     info.call('OnKeyUp', 256)
     info.call('OnLButtonUp', 20, info.state['answerTop']+1)
     info.call('OnUpdate', 0.016)
     assert len(info.chosen) == 1
-    assert info.native_calls.count('DiscoDialoguesChoiceSound') == 2
+    assert info.native_calls.count('PlaySound') == 2
     info.call('OnUIMessage', 4101, 'photo', None)
     assert info.state['viewMode'] == 0
-    assert info.native_calls.count('DiscoDialoguesChoiceSound') == 3
+    assert info.native_calls.count('PlaySound') == 3
     assert all(info.state[k] == v for k, v in before.items())
     info.call('OnKeyDown', 49)  # held while returning from information
     assert len(info.chosen) == 1
@@ -293,10 +293,10 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
     assert len(info.chosen) == 2
     info.call('OnUIMessage', 4101, 'photo', None)  # pending choice cannot open info
     assert info.state['viewMode'] == 0
-    assert info.native_calls.count('DiscoDialoguesChoiceSound') == 4  # Two choices, two accepted toggles.
+    assert info.native_calls.count('PlaySound') == 4  # Two choices, two accepted toggles.
     info.state['conversation'] = None
     info.call('OnUIMessage', 4101, 'photo', None)
-    assert info.native_calls.count('DiscoDialoguesChoiceSound') == 4
+    assert info.native_calls.count('PlaySound') == 4
 
     overflow = Feed(width, height, 'Old conversation ' * 100, replies=[('Long answer '*20, i, i+1) for i in range(12)])
     overflow.call('OnMouseWheel', 20, 10, 2)

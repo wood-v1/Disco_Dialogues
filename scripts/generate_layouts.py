@@ -104,6 +104,7 @@ def make_layout(original, size):
     title.append(copy.deepcopy(stock["name"].find("font")))
     feed = form(panel, "dialog_text", (cx+s(24), cy+s(188), cw-s(48), ch-s(212)), "disco_dialogues_feed.bin")
     feed.append(copy.deepcopy(stock["dialog_text"].find("font")))
+    ET.SubElement(feed, 'sound', name='disco-dialogs-action', stream='0', loop='0').text = 'disco-dialogs-action.ogg'
     accent_image(feed, 'feed_thumb', circle=True)
     accent_image(feed, 'feed_track')
     root.append(copy.deepcopy(original.find("cursor")))
@@ -114,6 +115,10 @@ def make_layout(original, size):
 def validate(original, generated, size):
     width, height, cx, cy, cw, ch = size
     nodes = {node.get("name"): node for node in generated.iter("form")}
+    sounds = list(generated.iter('sound'))
+    if len(sounds) != 1 or sounds[0] not in list(nodes['dialog_text']) or contract(sounds[0]) != (
+            'sound', (('loop', '0'), ('name', 'disco-dialogs-action'), ('stream', '0')), 'disco-dialogs-action.ogg', []):
+        raise ValueError('Native choice sound resource missing or changed')
     if set(nodes) != {f"disco_dialogues_{width}x{height}", "panel", "photo", "name", "dialog_text"}:
         raise ValueError("Unexpected legacy or missing feed widget")
     scripts = {n.get("name"): n.get("script") for n in generated.iter("form")}

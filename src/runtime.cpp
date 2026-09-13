@@ -2,7 +2,7 @@
 #include "layout_selection.h"
 #include "dialog_camera.h"
 #include "dialog_feed.h"
-#include "dialog_audio.h"
+#include "dialog_speech.h"
 #include <cstdio>
 #include <string>
 #include <atomic>
@@ -12,6 +12,7 @@ std::wstring iniPath;
 std::wstring uiDirectory;
 bool debugEnabled = false;
 bool cameraEnabled = true;
+bool preserveNpcSpeech = true;
 std::atomic<bool> runtimeReady{false};
 
 void Trace(const char* text) {
@@ -108,11 +109,13 @@ DWORD WINAPI Initialize(void* parameter) {
     uiDirectory = exe.substr(0, exe.find_last_of(L"\\/") + 1) + L"..\\..\\data\\UI\\";
     debugEnabled = ::GetPrivateProfileIntW(L"Debug", L"Enabled", 0, iniPath.c_str()) != 0;
     cameraEnabled = ::GetPrivateProfileIntW(L"Camera", L"FrameNPCOnLeft", 1, iniPath.c_str()) != 0;
+    preserveNpcSpeech = ::GetPrivateProfileIntW(L"Audio", L"PreserveNpcSpeech", 1, iniPath.c_str()) != 0;
+    if (::GetPrivateProfileIntW(L"Debug", L"SpeechTrace", 0, iniPath.c_str()))
+        disco_dialogues::InitializeDialogSpeechTrace((iniPath + L".speech.log").c_str());
     if (!::GetPrivateProfileIntW(L"General", L"Enabled", 1, iniPath.c_str())) return 0;
     // OynonTools has no listener removal API. Keep this DLL loaded for callback lifetime.
     HMODULE pinned = nullptr;
     if (!::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, module.c_str(), &pinned)) return 1;
-    disco_dialogues::InitializeDialogAudio(iniPath);
     if (!disco_dialogues::InstallDialogFeed()) {
         ::OutputDebugStringA("DiscoDialogues: unsupported or occupied UI ABI; leaving vanilla UI enabled\n");
         return 1;
@@ -121,13 +124,17 @@ DWORD WINAPI Initialize(void* parameter) {
         cameraEnabled = false;
         ::OutputDebugStringA("DiscoDialogues: camera hooks unavailable for this engine build; layout remains enabled\n");
     }
+    if (preserveNpcSpeech && !disco_dialogues::InstallDialogSpeech()) {
+        preserveNpcSpeech = false;
+        ::OutputDebugStringA("DiscoDialogues: speech hooks unavailable; using vanilla speech interruption\n");
+    }
     if (!OynonRegisterUIWindowPrepareCallback(Prepare, nullptr) ||
         !OynonRegisterUIWindowCreatedCallback(Created, nullptr)) return 1;
     if (!OynonInitializeHooksWhenReady(OYNON_HOOK_UI_WINDOW_PREPARE)) {
         Trace("UI hook initialization failed");
         return 1;
     }
-    Trace("Disco Dialogues 0.2.5 initialized");
+    Trace("Disco Dialogues 1.0.0 initialized");
     runtimeReady.store(true, std::memory_order_release);
     for (;;) {
         // Shared hook resilience; no inventory, input, effects or gameplay polling.
@@ -138,6 +145,11 @@ DWORD WINAPI Initialize(void* parameter) {
 }
 
 namespace disco_dialogues {
+bool ShouldPreserveDialogSpeech() {
+    if (!runtimeReady.load(std::memory_order_acquire) || !preserveNpcSpeech) return false;
+    ClientSize size;
+    return CurrentLayout(size) != nullptr;
+}
 float ResolveDialogLayoutFraction() {
     if (!cameraEnabled) return 0.0f;
     ClientSize size;

@@ -8,6 +8,7 @@
     </form>
     <form name="dialog_text" x="1056" y="177" w="504" h="683" script="disco_dialogues_feed.bin">
       <font name="default" size="18" face="fritz_quadrata" />
+      <sound name="disco-dialogs-action" stream="0" loop="0">disco-dialogs-action.ogg</sound>
       <image name="feed_thumb" x="0" y="0" w="0.5" h="1">ui/disco_dialogues_accents.tga</image>
       <image name="feed_track" x="0.75" y="0.5" w="0.03125" h="0.0625">ui/disco_dialogues_accents.tga</image>
     </form>

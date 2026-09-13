@@ -8,7 +8,7 @@ import zipfile
 import shutil
 from pathlib import Path
 import xml.etree.ElementTree as ET
-from generate_layouts import ROOT, DEFAULT_GAME, SIZES, read_vfs, make_layout, validate, forms, rect
+from generate_layouts import ROOT, SIZES, read_vfs, make_layout, validate, forms, rect
 
 
 def assert_x86_dll(data):
@@ -26,7 +26,7 @@ def assert_x86_dll(data):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--oynon-root', type=Path, default=ROOT.parent / 'OynonTools')
-    parser.add_argument('--game-root', type=Path, default=DEFAULT_GAME)
+    parser.add_argument('--game-root', type=Path, required=True)
     args = parser.parse_args()
     files = {
         'bin/Final/mods/DiscoDialogues.dll': ROOT / 'build-win32/Release/DiscoDialogues.dll',
@@ -36,8 +36,7 @@ def main():
         'bin/Final/GameModLauncher.ini': ROOT / 'release-assets/GameModLauncher.ini',
         'data/Scripts/disco_dialogues_feed.bin': ROOT / 'resources/scripts/disco_dialogues_feed.bin',
         'data/Textures/ui/disco_dialogues_accents.tga': ROOT / 'resources/textures/ui/disco_dialogues_accents.tga',
-        'bin/Final/mods/sounds/disco_dialogues/inv-action.ogg': ROOT / 'resources/audio/inv-action.ogg',
-        'bin/Final/mods/sounds/DialogOptionClick.wav': ROOT / 'resources/audio/inv-action.wav',
+        'data/Sounds/disco-dialogs-action.ogg': ROOT / 'resources/audio/disco-dialogs-action.ogg',
     }
     custom_scripts = {f'disco_dialogues_{part}.bin' for part in ('feed', 'panel', 'photo', 'title')}
     for name in custom_scripts:
@@ -59,8 +58,11 @@ def main():
     scripts.difference_update(custom_scripts)
     script_data = read_vfs(args.game_root / 'data/Scripts.vfs', sorted(scripts))
     payload = {name: path.read_bytes() for name, path in files.items()}
+    assert sorted(name for name in payload if name.lower().endswith(('.ogg', '.wav'))) == ['data/Sounds/disco-dialogs-action.ogg']
     # A matching shared runtime is required for the Inventory Overhaul hotfix.
     import pefile
+    mod_pe = pefile.PE(data=payload['bin/Final/mods/DiscoDialogues.dll'])
+    assert all(entry.dll.lower() != b'winmm.dll' for entry in mod_pe.DIRECTORY_ENTRY_IMPORT), 'Separate WinMM player remains linked'
     shared_pe = pefile.PE(data=payload['bin/Final/mods/OynonTools.dll'])
     exports = {symbol.name for symbol in shared_pe.DIRECTORY_ENTRY_EXPORT.symbols}
     required_exports = {b'OynonUIDialogBlocksItemHotkeys', b'OynonUIDialogInputGeneration'}
@@ -75,22 +77,22 @@ def main():
     assert hints['Mods']['LoadOrder'] == 'OynonTools.dll@suspended, DiscoDialogues.dll@ui+3000'
     release = ROOT / 'release'
     release.mkdir(exist_ok=True)
-    zip_path = release / 'Pathologic_Disco_Dialogues_0_2_5.zip'
+    zip_path = release / 'Pathologic_Disco_Dialogues_1_0_0.zip'
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as archive:
         for name, data in sorted(payload.items()):
             archive.writestr(name, data)
     with zipfile.ZipFile(zip_path) as archive:
         assert archive.testzip() is None
-        assert set(archive.namelist()) == set(files) and len(archive.namelist()) == 15
+        assert set(archive.namelist()) == set(files) and len(archive.namelist()) == 14
         for name, data in payload.items():
             assert archive.read(name) == data
     report = {
         'package': zip_path.name,
         'sha256': hashlib.sha256(zip_path.read_bytes()).hexdigest(),
         'checks': ['PE32 x86 DLLs', 'XML contracts and bounds', 'vanilla script references exist',
-                   'exact 15-file allowlist', 'ZIP CRC and payload byte equality', 'shared DLL install hints',
+                   'exact 14-file allowlist', 'ZIP CRC and payload byte equality', 'shared DLL install hints',
                    'shared dialog gate exports'],
-        'gameplay_validation': 'NOT RUN; native desktop automation unavailable in this session',
+        'gameplay_validation': 'NOT RUN; static and isolated tests only',
         'files': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(payload.items())},
         'vanilla_script_hashes': {name: hashlib.sha256(data).hexdigest() for name, data in script_data.items()},
     }
@@ -107,7 +109,7 @@ def main():
     report['compatibility'] = {name: hashlib.sha256((compatibility / name).read_bytes()).hexdigest()
                                for name in ('InventoryOverhaul.dll', 'OynonTools.dll')}
     (release / 'validation.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-    print(f'PASS: {zip_path} (15 entries; {len(scripts)} unchanged stock script references; four custom UI BINs); matching compatibility DLLs')
+    print(f'PASS: {zip_path} (14 entries; {len(scripts)} unchanged stock script references; four custom UI BINs); matching compatibility DLLs')
 
 
 if __name__ == '__main__':

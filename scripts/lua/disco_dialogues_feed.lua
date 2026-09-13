@@ -37,6 +37,7 @@ maintask DiscoDialoguesFeed do
   local key2Held: bool
   local key3Held: bool
   local key4Held: bool
+  local key5Held: bool
   local const DIALOGUE: int = 0
   local const CHARACTER_INFO: int = 1
   local const NPC: int = 1
@@ -182,7 +183,7 @@ maintask DiscoDialoguesFeed do
       viewMode = CHARACTER_INFO
     end
     -- Sound belongs to the accepted toggle, not to both photo and feed handlers.
-    native.DiscoDialoguesChoiceSound()
+    native.PlaySound("disco-dialogs-action")
   end
 
   function DrawDialogueRow(text: string, kind: int, y: int) -> void
@@ -293,7 +294,7 @@ maintask DiscoDialoguesFeed do
     if answerIndex < 0 || answerIndex >= count then return end
     native.GetAnswer(answerIndex, answer, nextId, replyId)
     if answer == "" then return end
-    native.DiscoDialoguesChoiceSound()
+    native.PlaySound("disco-dialogs-action")
     native.SelectAnswer(nextId, replyId)
     -- Keep the last complete frame until the actor has processed the choice.
     pendingNpc = npcName + " — " + replic
@@ -403,7 +404,7 @@ maintask DiscoDialoguesFeed do
     answerScroll = Clamp(answerScroll, answerMax)
   end
   -- Same HD keyboard/gamepad codes and event phases as the stock answer view.
-  -- HD UI callbacks receive virtual keys (49..52 for the number row).
+  -- HD UI callbacks receive virtual keys (49..53 for the number row).
   -- The binding IDs 201..204 registered at Game.exe RVA 0x216eb8 are a
   -- different namespace; stock gamepad UI handlers also use virtual keys.
   function ChooseNumber(index: int) -> void
@@ -433,6 +434,10 @@ maintask DiscoDialoguesFeed do
       if !key4Held then key4Held = true ChooseNumber(3) end
       return
     end
+    if key == 53 then
+      if !key5Held then key5Held = true ChooseNumber(4) end
+      return
+    end
     if viewMode == CHARACTER_INFO then
       if key == 267 then infoScroll = Clamp(infoScroll - fontHeight, infoMax) end
       if key == 268 then infoScroll = Clamp(infoScroll + fontHeight, infoMax) end
@@ -446,6 +451,7 @@ maintask DiscoDialoguesFeed do
     if key == 50 then key2Held = false return end
     if key == 51 then key3Held = false return end
     if key == 52 then key4Held = false return end
+    if key == 53 then key5Held = false return end
     if viewMode == CHARACTER_INFO then
       if key == 272 then infoScroll = Clamp(infoScroll - fontHeight, infoMax) end
       if key == 274 then infoScroll = Clamp(infoScroll + fontHeight, infoMax) end

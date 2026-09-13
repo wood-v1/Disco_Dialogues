@@ -52,12 +52,12 @@ def main():
     assert before
     shared = final / 'mods/OynonTools.dll'
     shared_hash = hashlib.sha256(shared.read_bytes()).hexdigest()
-    package = ROOT / 'release/Pathologic_Disco_Dialogues_0_2_5.zip'
+    package = ROOT / 'release/Pathologic_Disco_Dialogues_1_0_0.zip'
     run('install', '--zip', package, '--name', 'Disco Dialogues', '--dll', 'DiscoDialogues.dll', '--skip-dll', 'OynonTools.dll')
     assert inventory_snapshot() == before
     assert hashlib.sha256(shared.read_bytes()).hexdigest() == shared_hash
     with zipfile.ZipFile(package) as archive:
-        owned = [name for name in archive.namelist() if 'DiscoDialogues.' in name or 'disco_dialogues_' in name or '/sounds/disco_dialogues/' in name or name.endswith('/DialogOptionClick.wav')]
+        owned = [name for name in archive.namelist() if 'DiscoDialogues.' in name or 'disco_dialogues_' in name or name == 'data/Sounds/disco-dialogs-action.ogg']
         for name in owned:
             assert (fixture / name).read_bytes() == archive.read(name)
     cfg = configparser.ConfigParser()

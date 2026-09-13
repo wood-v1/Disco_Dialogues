@@ -1,10 +1,8 @@
 {
-  "source": "inv-action.ogg",
-  "source_sha256": "98f9edd03ee103d84d6df1f296759fd88fdfe7e8d08907ba92e15abb5dbaa9dc",
-  "runtime": "inv-action.wav",
-  "runtime_sha256": "6d7a21971a6d9288fb71ee30d7479a598f5b5c7828d01a736da3ade3d3f93c87",
+  "file": "disco-dialogs-action.ogg",
+  "sha256": "98f9edd03ee103d84d6df1f296759fd88fdfe7e8d08907ba92e15abb5dbaa9dc",
   "channels": 2,
   "rate": 48000,
-  "frames": 37601,
-  "duration_seconds": 0.7833541666666667
+  "frames": 37729,
+  "duration_seconds": 0.7860208333333333
 }
