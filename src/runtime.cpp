@@ -1,8 +1,7 @@
 #include "OynonToolsApi.h"
+#include "dialog_policy.h"
 #include "layout_selection.h"
-#include "dialog_camera.h"
-#include "dialog_feed.h"
-#include "dialog_speech.h"
+#include <cstring>
 #include <cstdio>
 #include <string>
 #include <atomic>
@@ -143,7 +142,6 @@ DWORD WINAPI Initialize(void* parameter) {
     }
 }
 }
-
 namespace disco_dialogues {
 bool ShouldPreserveDialogSpeech() {
     if (!runtimeReady.load(std::memory_order_acquire) || !preserveNpcSpeech) return false;

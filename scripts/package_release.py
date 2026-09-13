@@ -30,7 +30,7 @@ def main():
     args = parser.parse_args()
     files = {
         'bin/Final/mods/DiscoDialogues.dll': ROOT / 'build-win32/Release/DiscoDialogues.dll',
-        'bin/Final/mods/OynonTools.dll': args.oynon_root / 'bin/Win32/Release/OynonTools.dll',
+        'bin/Final/mods/OynonTools.dll': ROOT / 'build-win32/Release/OynonTools.dll',
         'bin/Final/mods/DiscoDialogues.ini': ROOT / 'release-assets/DiscoDialogues.ini',
         'bin/Final/mods/DiscoDialogues.manifest.ini': ROOT / 'release-assets/DiscoDialogues.manifest.ini',
         'bin/Final/GameModLauncher.ini': ROOT / 'release-assets/GameModLauncher.ini',
@@ -66,6 +66,10 @@ def main():
     shared_pe = pefile.PE(data=payload['bin/Final/mods/OynonTools.dll'])
     exports = {symbol.name for symbol in shared_pe.DIRECTORY_ENTRY_EXPORT.symbols}
     required_exports = {b'OynonUIDialogBlocksItemHotkeys', b'OynonUIDialogInputGeneration'}
+    runtime_exports = {b'OynonInstallCameraTransitHook', b'OynonInstallUIExecuteHook',
+                       b'OynonInstallScriptAudioHooks', b'OynonProceedCameraTransit',
+                       b'OynonProceedUIExecute', b'OynonProceedSpeech'}
+    assert runtime_exports <= exports, 'OynonTools is missing the runtime API'
     assert required_exports <= exports, 'Rebuild OynonTools with the dialog input gate'
     for name, data in payload.items():
         if name.endswith('.dll'):
@@ -91,7 +95,7 @@ def main():
         'sha256': hashlib.sha256(zip_path.read_bytes()).hexdigest(),
         'checks': ['PE32 x86 DLLs', 'XML contracts and bounds', 'vanilla script references exist',
                    'exact 14-file allowlist', 'ZIP CRC and payload byte equality', 'shared DLL install hints',
-                   'shared dialog gate exports'],
+                   'shared dialog gate exports', 'runtime adapter exports'],
         'gameplay_validation': 'NOT RUN; static and isolated tests only',
         'files': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(payload.items())},
         'vanilla_script_hashes': {name: hashlib.sha256(data).hexdigest() for name, data in script_data.items()},

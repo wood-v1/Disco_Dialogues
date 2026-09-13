@@ -1,4 +1,5 @@
 // Exercise the actual x86 hook entry points, with native transports substituted.
+#include "script_audio_hooks.cpp"
 #include "../src/dialog_speech.cpp"
 #include <array>
 #include <cstdio>
@@ -9,13 +10,15 @@
 #include <limits>
 #include <stdexcept>
 
-#define CHECK(expr) do { if (!(expr)) { std::printf("FAIL line %d: %s\n", __LINE__, #expr); std::abort(); } } while (0)
+#define CHECK(expr) do { if (!(expr)) { std::printf("FAIL line %d: %s\n", __LINE__, #expr); std::fflush(stdout); std::abort(); } } while (0)
 
 namespace disco_dialogues {
 bool enabled = true;
 bool ShouldPreserveDialogSpeech() { return enabled; }
 }
-using namespace disco_dialogues;
+using namespace oynon::runtime;
+using disco_dialogues::enabled;
+using disco_dialogues::replyScope;
 
 // HD uses a controller -> task -> ITaskScripted -> IScript chain. In particular,
 // the controller stored on the actor must never equal the event's script.
@@ -194,6 +197,7 @@ void TestExitResume(bool buffered) {
 }
 
 int main(int argc, char** argv) {
+    callbacks = {disco_dialogues::Event, disco_dialogues::Speech, disco_dialogues::Resume};
     taskTable[2] = reinterpret_cast<void*>(&QueryTask);
     scriptedTable[3] = reinterpret_cast<void*>(&TaskScript);
     controllerTable[3] = reinterpret_cast<void*>(&ControllerScript);
@@ -326,6 +330,28 @@ int main(int argc, char** argv) {
     actor.Start(&script1);
     CHECK(!Stop(native));
     std::puts("PASS: real x86 hooks; HD controller/task layout; 10000 immediate replies; nested events, cleanup, replacement speech, absent voice, waiters and errors");
+    // The adapter itself must contain no reply-preservation policy.
+    callbacks = {};
+    actor.Start(&script1);
+    handler = [&](void*, unsigned, unsigned) { CHECK(!Stop(native)); };
+    const int beforePassthrough = stopCalls;
+    Event(&script1);
+    CHECK(stopCalls == beforePassthrough + 1 && actor.Get<float>(0x334) == 0);
+    int token = 0;
+    callbackData = &token;
+    callbacks.speech = [](const OynonSpeechCall* call, void* data) -> BOOL {
+        ++*static_cast<int*>(data);
+        CHECK(call->count == 42);
+        return TRUE;
+    };
+    CHECK(Stop(native, 42) && token == 1 && stopCalls == beforePassthrough + 1);
+    callbacks.event = [](const OynonScriptEventCall* call, void* data) -> int {
+        ++*static_cast<int*>(data);
+        CHECK(call->event == 6 && call->count == 0);
+        return 123;
+    };
+    CHECK(SendEvent(&script1, nullptr, 6, 0, arguments) == 123 && token == 2);
+    std::puts("PASS: generic passthrough and unrelated client event/speech policies with userData");
     if (nativeCode) {
         std::puts("PASS: executed native GetScript bodies extracted from installed HD Game.exe");
         CHECK(::VirtualFree(nativeCode, 0, MEM_RELEASE));

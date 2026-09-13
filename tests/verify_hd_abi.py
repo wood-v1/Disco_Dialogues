@@ -17,6 +17,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--game-root', type=Path, required=True)
     parser.add_argument('--pathologic-re', type=Path, required=True)
+    parser.add_argument('--oynon-root', type=Path, default=ROOT.parent / 'OynonTools')
     args = parser.parse_args()
     import pefile
     modules = {}
@@ -51,8 +52,8 @@ def main():
         expected = bytes.fromhex(encoded)
         assert modules[module][1][offset:offset+len(expected)] == expected, (module, hex(offset))
         checked += 1
-    for source in ['src/dialog_camera.cpp', 'src/dialog_feed.cpp', 'src/dialog_speech.cpp']:
-        text = (ROOT / source).read_text(encoding='utf-8')
+    for source in ['camera_hook.cpp', 'ui_execute_hook.cpp', 'script_audio_hooks.cpp']:
+        text = (args.oynon_root / 'src/runtime' / source).read_text(encoding='utf-8')
         for symbol, address, encoded, length in re.findall(
                 r'hd::Bytes\((g|e|ui|s), (0x[0-9a-f]+), "([^"]+)", (\d+)\)', text):
             module = {'g': 'Game.exe', 'e': 'Engine.dll', 'ui': 'UI.dll', 's': 'Sound.dll'}[symbol]
@@ -92,7 +93,7 @@ def main():
     assert image[0x153190:0x15319e] == bytes.fromhex('f30f10442404f30f114124c20400')
     assert target(10) == 0x152c80  # GetImportFOV -> virtual GetViewFOV.
     assert image[0x152c80:0x152c88] == bytes.fromhex('8b018b4020ffe0cc')
-    header = (ROOT / 'src/camera_abi.h').read_text(encoding='utf-8')
+    header = (args.oynon_root / 'src/runtime/camera_abi.h').read_text(encoding='utf-8')
     assert '>(camera, 10)(camera)' in header
 
     sys.path.insert(0, str(args.pathologic_re / 'parser/lib'))

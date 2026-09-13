@@ -26,13 +26,15 @@ When upgrading from 0.2.8 or earlier, remove the old Disco Dialogues package thr
 
 Requires CMake, MSVC with x86 tools, Python 3, and the OynonTools, UtopianInventory, pathologic_lua_compiler, and pathologic_re projects. Python dependencies include pefile and those required by the compiler tools.
 
-Place the dependency repositories beside this project and build OynonTools first. Then run:
+Place the dependency repositories beside this project. CMake builds OynonTools from source with the mod; packaging and the Inventory compatibility build use that same DLL/import library. Then run:
 
 ```powershell
 ./build-release.ps1 -GameRoot '<game folder>'
 ```
 
 The mod ZIP is written to `release/`.
+
+Generic runtime adapters and ABI tests live in OynonTools; dialogue behaviour and its tests live in this mod. See [the library boundary and API](HOOK_EXTRACTION.md) for ownership, callback lifetime and remaining limitations.
 
 ## Compatibility
 
