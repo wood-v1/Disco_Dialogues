@@ -22,14 +22,23 @@ void Trace(const char* text) {
     }
 }
 
-struct ClientSize { int width = 0; int height = 0; int candidates = 0; };
+struct ClientSize {
+    int width = 0;
+    int height = 0;
+    int candidates = 0;
+};
+
 BOOL CALLBACK FindGameWindow(HWND window, LPARAM data) {
     DWORD process = 0;
     ::GetWindowThreadProcessId(window, &process);
-    if (process != ::GetCurrentProcessId() || !::IsWindowVisible(window) ||
-        ::IsIconic(window) || ::GetWindow(window, GW_OWNER)) return TRUE;
+    if (process != ::GetCurrentProcessId() || !::IsWindowVisible(window) || ::IsIconic(window) ||
+        ::GetWindow(window, GW_OWNER))
+        return TRUE;
+
     RECT rect{};
-    if (!::GetClientRect(window, &rect) || rect.right <= 0 || rect.bottom <= 0) return TRUE;
+    if (!::GetClientRect(window, &rect) || rect.right <= 0 || rect.bottom <= 0)
+        return TRUE;
+
     auto& size = *reinterpret_cast<ClientSize*>(data);
     ++size.candidates;
     size.width = rect.right;
@@ -38,24 +47,30 @@ BOOL CALLBACK FindGameWindow(HWND window, LPARAM data) {
 }
 
 const char* CurrentLayout(ClientSize& size) {
-    if (!runtimeReady.load(std::memory_order_acquire)) return nullptr;
+    if (!runtimeReady.load(std::memory_order_acquire))
+        return nullptr;
+
     // Match physical client pixels even when the calling thread is DPI virtualized.
     using SetDpi = HANDLE(WINAPI*)(HANDLE);
     const auto setDpi = reinterpret_cast<SetDpi>(
         ::GetProcAddress(::GetModuleHandleW(L"user32.dll"), "SetThreadDpiAwarenessContext"));
     const HANDLE previous = setDpi ? setDpi(reinterpret_cast<HANDLE>(-4)) : nullptr;
     ::EnumWindows(FindGameWindow, reinterpret_cast<LPARAM>(&size));
-    if (setDpi && previous) setDpi(previous);
+    if (setDpi && previous)
+        setDpi(previous);
+
     const char* replacement = nullptr;
     if (size.candidates == 1 && ::GetPrivateProfileIntW(L"General", L"Enabled", 1, iniPath.c_str())) {
         replacement = disco_dialogues::SelectLayout("dialog.xml", size.width, size.height);
     }
+
     if (replacement) {
         const std::string name(replacement);
         const std::wstring path = uiDirectory + std::wstring(name.begin(), name.end());
         const DWORD attributes = ::GetFileAttributesW(path.c_str());
         const std::wstring accents = uiDirectory + L"..\\Textures\\ui\\disco_dialogues_accents.tga";
         const DWORD accentAttributes = ::GetFileAttributesW(accents.c_str());
+
         bool scriptsPresent = true;
         for (const auto component : {L"feed", L"panel", L"photo", L"title"}) {
             const std::wstring script = uiDirectory + L"..\\Scripts\\disco_dialogues_" + component + L".bin";
@@ -63,6 +78,7 @@ const char* CurrentLayout(ClientSize& size) {
             if (scriptAttributes == INVALID_FILE_ATTRIBUTES || (scriptAttributes & FILE_ATTRIBUTE_DIRECTORY))
                 scriptsPresent = false;
         }
+
         if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) ||
             !scriptsPresent || accentAttributes == INVALID_FILE_ATTRIBUTES ||
             (accentAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
@@ -70,71 +86,96 @@ const char* CurrentLayout(ClientSize& size) {
             replacement = nullptr;
         }
     }
+
     return replacement;
 }
 
 void __stdcall Prepare(const char* xml, void*) {
-    if (!xml || std::strcmp(xml, "dialog.xml") != 0) return;
+    if (!xml || std::strcmp(xml, "dialog.xml") != 0)
+        return;
+
     ClientSize size;
     const char* replacement = CurrentLayout(size);
+
     // Re-evaluate every opening, including disable/resolution changes: clear stale redirects.
     if (!OynonUISetWindowRedirect(xml, replacement)) {
         Trace("redirect configuration failed");
         replacement = nullptr;
     }
+
     char line[256]{};
-    std::snprintf(line, sizeof(line), "prepare %s client=%dx%d windows=%d -> %s",
-        xml, size.width, size.height, size.candidates, replacement ? replacement : xml);
+    std::snprintf(line, sizeof(line), "prepare %s client=%dx%d windows=%d -> %s", xml, size.width,
+        size.height, size.candidates, replacement ? replacement : xml);
     Trace(line);
 }
 
 void __stdcall Created(const char* original, const char* resolved, BOOL succeeded, DWORD, void*) {
-    if (!original || std::strcmp(original, "dialog.xml") != 0) return;
+    if (!original || std::strcmp(original, "dialog.xml") != 0)
+        return;
+
     char line[256]{};
-    std::snprintf(line, sizeof(line), "created %s -> %s success=%d", original,
-        resolved ? resolved : "(null)", succeeded);
+    std::snprintf(line, sizeof(line), "created %s -> %s success=%d", original, resolved ? resolved : "(null)",
+        succeeded);
     Trace(line);
 }
 
 DWORD WINAPI Initialize(void* parameter) {
     wchar_t path[32768]{};
     DWORD length = ::GetModuleFileNameW(static_cast<HMODULE>(parameter), path, 32768);
-    if (!length || length >= 32768) return 1;
+    if (!length || length >= 32768)
+        return 1;
+
     const std::wstring module(path, length);
     iniPath = module.substr(0, module.find_last_of(L"\\/") + 1) + L"DiscoDialogues.ini";
+
     length = ::GetModuleFileNameW(nullptr, path, 32768);
-    if (!length || length >= 32768) return 1;
+    if (!length || length >= 32768)
+        return 1;
+
     const std::wstring exe(path, length);
     uiDirectory = exe.substr(0, exe.find_last_of(L"\\/") + 1) + L"..\\..\\data\\UI\\";
+
     debugEnabled = ::GetPrivateProfileIntW(L"Debug", L"Enabled", 0, iniPath.c_str()) != 0;
     cameraEnabled = ::GetPrivateProfileIntW(L"Camera", L"FrameNPCOnLeft", 1, iniPath.c_str()) != 0;
     preserveNpcSpeech = ::GetPrivateProfileIntW(L"Audio", L"PreserveNpcSpeech", 1, iniPath.c_str()) != 0;
     if (::GetPrivateProfileIntW(L"Debug", L"SpeechTrace", 0, iniPath.c_str()))
         disco_dialogues::InitializeDialogSpeechTrace((iniPath + L".speech.log").c_str());
-    if (!::GetPrivateProfileIntW(L"General", L"Enabled", 1, iniPath.c_str())) return 0;
+    if (!::GetPrivateProfileIntW(L"General", L"Enabled", 1, iniPath.c_str()))
+        return 0;
+
     // OynonTools has no listener removal API. Keep this DLL loaded for callback lifetime.
     HMODULE pinned = nullptr;
-    if (!::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, module.c_str(), &pinned)) return 1;
+    if (!::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, module.c_str(), &pinned))
+        return 1;
+
     if (!disco_dialogues::InstallDialogFeed()) {
         ::OutputDebugStringA("DiscoDialogues: unsupported or occupied UI ABI; leaving vanilla UI enabled\n");
         return 1;
     }
+
     if (cameraEnabled && !disco_dialogues::InstallDialogCamera()) {
         cameraEnabled = false;
-        ::OutputDebugStringA("DiscoDialogues: camera hooks unavailable for this engine build; layout remains enabled\n");
+        ::OutputDebugStringA(
+            "DiscoDialogues: camera hooks unavailable for this engine build; layout remains enabled\n");
     }
+
     if (preserveNpcSpeech && !disco_dialogues::InstallDialogSpeech()) {
         preserveNpcSpeech = false;
         ::OutputDebugStringA("DiscoDialogues: speech hooks unavailable; using vanilla speech interruption\n");
     }
+
     if (!OynonRegisterUIWindowPrepareCallback(Prepare, nullptr) ||
-        !OynonRegisterUIWindowCreatedCallback(Created, nullptr)) return 1;
+        !OynonRegisterUIWindowCreatedCallback(Created, nullptr))
+        return 1;
+
     if (!OynonInitializeHooksWhenReady(OYNON_HOOK_UI_WINDOW_PREPARE)) {
         Trace("UI hook initialization failed");
         return 1;
     }
+
     Trace("Disco Dialogues 1.0.0 initialized");
     runtimeReady.store(true, std::memory_order_release);
+
     for (;;) {
         // Shared hook resilience; no inventory, input, effects or gameplay polling.
         OynonUIPoll();
@@ -142,16 +183,24 @@ DWORD WINAPI Initialize(void* parameter) {
     }
 }
 }
+
 namespace disco_dialogues {
 bool ShouldPreserveDialogSpeech() {
-    if (!runtimeReady.load(std::memory_order_acquire) || !preserveNpcSpeech) return false;
+    if (!runtimeReady.load(std::memory_order_acquire) || !preserveNpcSpeech)
+        return false;
+
     ClientSize size;
     return CurrentLayout(size) != nullptr;
 }
+
 float ResolveDialogLayoutFraction() {
-    if (!cameraEnabled) return 0.0f;
+    if (!cameraEnabled)
+        return 0.0f;
+
     ClientSize size;
-    if (!CurrentLayout(size)) return 0.0f;
+    if (!CurrentLayout(size))
+        return 0.0f;
+
     const float left = size.width == 1920 ? 1243.0f : size.width == 1600 ? 1036.0f : 885.0f;
     return left / static_cast<float>(size.width);
 }
@@ -161,7 +210,8 @@ BOOL WINAPI DllMain(HMODULE module, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
         ::DisableThreadLibraryCalls(module);
         const HANDLE thread = ::CreateThread(nullptr, 0, Initialize, module, 0, nullptr);
-        if (thread) ::CloseHandle(thread);
+        if (thread)
+            ::CloseHandle(thread);
     }
     return TRUE;
 }
