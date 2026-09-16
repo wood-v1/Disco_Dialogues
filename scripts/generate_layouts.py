@@ -1,4 +1,4 @@
-"""Read vanilla UI.vfs without extraction into the game; change form geometry only."""
+"""Generate mod-owned layouts and a language-independent UI atlas."""
 import argparse
 import copy
 import hashlib
@@ -15,14 +15,15 @@ SIZES = [(1920, 1080, 1243, 24, 653, 1032),
 
 
 def accent_texture():
-    # Tiny code-generated UI atlas: antialiased cream circle and solid swatch.
+    # Cream circle, cream swatch, and opaque black panel swatch (top right).
     # Uncompressed BGRA TGA, same format as Inventory Overhaul's runtime texture.
     header = struct.pack('<BBBHHBHHHHBB', 0, 0, 2, 0, 0, 0, 0, 0, 32, 16, 32, 40)
     pixels = bytearray()
     for y in range(16):
         for x in range(32):
             alpha = round(255 * max(0, min(1, 7.5 - math.hypot(x - 7.5, y - 7.5)))) if x < 16 else 255
-            pixels.extend((218, 237, 244, alpha))  # #F4EDDA
+            pixels.extend((0, 0, 0, 255) if x >= 16 and y < 4 else
+                          (218, 237, 244, alpha))  # #F4EDDA
     return header + pixels
 
 
@@ -97,7 +98,10 @@ def make_layout(original, size):
         return node
     stock = {node.get("name"): node for node in original.iter("form")}
     panel = form(root, "panel", (cx, cy, cw, ch), "disco_dialogues_panel.bin")
-    panel.append(copy.deepcopy(stock["panel"].find("image")))
+    # Stock atlas names/UVs vary by language. Sample inside our black swatch;
+    # the panel script applies BACKGROUND_ALPHA when drawing it.
+    ET.SubElement(panel, 'image', name='default', x='0.75', y='0.0625',
+                  w='0.03125', h='0.0625').text = 'ui/disco_dialogues_accents.tga'
     accent_image(panel, 'panel_edge')
     form(panel, "photo", (cx+s(24), cy+s(24), s(174), s(144)), "disco_dialogues_photo.bin")
     title = form(panel, "name", (cx+s(222), cy+s(24), cw-s(246), s(144)), "disco_dialogues_title.bin")
@@ -115,6 +119,11 @@ def make_layout(original, size):
 def validate(original, generated, size):
     width, height, cx, cy, cw, ch = size
     nodes = {node.get("name"): node for node in generated.iter("form")}
+    background = nodes['panel'].find("image[@name='default']")
+    if background is None or contract(background) != (
+            'image', (('h', '0.0625'), ('name', 'default'), ('w', '0.03125'),
+                      ('x', '0.75'), ('y', '0.0625')), 'ui/disco_dialogues_accents.tga', []):
+        raise ValueError('Panel must use the language-independent background swatch')
     sounds = list(generated.iter('sound'))
     if len(sounds) != 1 or sounds[0] not in list(nodes['dialog_text']) or contract(sounds[0]) != (
             'sound', (('loop', '0'), ('name', 'disco-dialogs-action'), ('stream', '0')), 'disco-dialogs-action.ogg', []):
@@ -157,7 +166,7 @@ def main():
     originals = read_vfs(args.game_root / "data/UI.vfs", names)
     output = ROOT / "resources/ui"
     output.mkdir(parents=True, exist_ok=True)
-    report = ["# Geometry changes", "", "Mod-owned component tree. Coordinates, stock fonts, background texture and cursor are retained. Panel opacity, portrait toggle and uppercase title use mod-owned scripts. The same feed switches between dialogue and scrollable character information.", ""]
+    report = ["# Geometry changes", "", "Mod-owned component tree and language-independent background texture. Stock fonts and cursor are retained. Panel opacity, portrait toggle and uppercase title use mod-owned scripts. The same feed switches between dialogue and scrollable character information.", ""]
     hashes = {}
     for size, name in zip(SIZES, names):
         raw = originals[name]

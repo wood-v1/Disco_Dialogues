@@ -8,7 +8,7 @@ import zipfile
 import shutil
 from pathlib import Path
 import xml.etree.ElementTree as ET
-from generate_layouts import ROOT, SIZES, read_vfs, make_layout, validate, forms, rect
+from generate_layouts import ROOT, SIZES, read_vfs, make_layout, validate, forms, rect, accent_texture
 
 
 def assert_x86_dll(data):
@@ -58,6 +58,8 @@ def main():
     scripts.difference_update(custom_scripts)
     script_data = read_vfs(args.game_root / 'data/Scripts.vfs', sorted(scripts))
     payload = {name: path.read_bytes() for name, path in files.items()}
+    if payload['data/Textures/ui/disco_dialogues_accents.tga'] != accent_texture():
+        raise ValueError('UI atlas is stale; regenerate layouts and textures')
     assert sorted(name for name in payload if name.lower().endswith(('.ogg', '.wav'))) == ['data/Sounds/disco-dialogs-action.ogg']
     # A matching shared runtime is required for the Inventory Overhaul hotfix.
     import pefile

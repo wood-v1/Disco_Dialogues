@@ -1,6 +1,6 @@
 <form name="disco_dialogues_1600x900" x="0" y="0" w="1600" h="900" script="ui_dialog.bin">
   <form name="panel" x="1036" y="20" w="544" h="860" script="disco_dialogues_panel.bin">
-    <image name="default" x="0.04101563" y="0.875" w="0.001953125" h="0.015625">ui/ui_group_1_1.tex</image>
+    <image name="default" x="0.75" y="0.0625" w="0.03125" h="0.0625">ui/disco_dialogues_accents.tga</image>
     <image name="panel_edge" x="0.75" y="0.5" w="0.03125" h="0.0625">ui/disco_dialogues_accents.tga</image>
     <form name="photo" x="1056" y="40" w="145" h="120" script="disco_dialogues_photo.bin" />
     <form name="name" x="1221" y="40" w="339" h="120" script="disco_dialogues_title.bin">

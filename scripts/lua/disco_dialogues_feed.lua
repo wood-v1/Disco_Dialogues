@@ -20,6 +20,9 @@ maintask DiscoDialoguesFeed do
   local answerTop: int
   local answerHeight: int
   local historyScroll: int
+  local historyAnimating: bool = false
+  local historyScrollStart: int
+  local historyScrollElapsed: float
   local answerScroll: int
   local historyMax: int
   local answerMax: int
@@ -44,6 +47,7 @@ maintask DiscoDialoguesFeed do
   local const PLAYER: int = 2
   local const GAP: int = 12
   local const ANSWER_GAP: int = 5
+  local const SCROLL_DURATION: float = 0.5
 
   function init() -> void
     native.GetWindowSize(width, height)
@@ -147,7 +151,17 @@ maintask DiscoDialoguesFeed do
     if historyMax < 0 then historyMax = 0 end
     answerMax = answerTotal - answerHeight
     if answerMax < 0 then answerMax = 0 end
-    historyScroll = historyMax
+    historyAnimating = false
+    if count > 0 && viewMode == DIALOGUE then
+      -- Actor updates can arrive after OnUpdate, even during OnDraw/input.
+      -- Every revision follows from the visible position, never from the end.
+      historyScrollStart = Clamp(historyScroll, historyMax)
+      historyScroll = historyScrollStart
+      historyScrollElapsed = 0.0
+      if historyScroll < historyMax then historyAnimating = true end
+    else
+      historyScroll = historyMax
+    end
     if dragging != 0 then dragging = 0 native.ReleaseMouse() end
   end
 
@@ -160,6 +174,20 @@ maintask DiscoDialoguesFeed do
     end
     pending = false
     if viewMode == DIALOGUE then Refresh(follow) end
+    if viewMode != DIALOGUE then return end
+    if follow then return end
+    if !historyAnimating || delta <= 0.0 then return end
+    historyScrollElapsed = historyScrollElapsed + delta
+    if historyScrollElapsed >= SCROLL_DURATION then
+      historyScroll = historyMax
+      historyAnimating = false
+      return
+    end
+    local progress: float = historyScrollElapsed / SCROLL_DURATION
+    -- Smoothstep gives the motion a gentle start and finish.
+    local eased: float = progress * progress * (3.0 - 2.0 * progress)
+    local movement: int = eased * (historyMax - historyScrollStart)
+    historyScroll = historyScrollStart + movement
   end
 
   function OnUIMessage(message: int, sender: string, data: object) -> void
@@ -336,6 +364,7 @@ maintask DiscoDialoguesFeed do
       end
     end
     if maximum <= 0 || y >= top + viewport then dragging = 0 return end
+    if dragging == 1 then historyAnimating = false end
     local size: int = ThumbSize(viewport, maximum)
     local thumb: int = top + scroll * (viewport - size) / maximum
     dragOffset = size / 2
@@ -370,7 +399,10 @@ maintask DiscoDialoguesFeed do
       return
     end
     if y >= answerTop && answerMax > 0 then answerScroll = Clamp(answerScroll - movement, answerMax)
-    else historyScroll = Clamp(historyScroll - movement, historyMax) end
+    else
+      historyAnimating = false
+      historyScroll = Clamp(historyScroll - movement, historyMax)
+    end
     selected = HitAnswer(x, y)
   end
 

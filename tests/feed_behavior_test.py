@@ -182,7 +182,12 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
     assert s['current'] == old_current and feed.chosen == [(42, 7)]
     feed.call('OnUpdate', 0.016)
     assert len(s['rows']) == 2 and s['current'].endswith(feed.line)
-    assert s['historyScroll'] == s['historyMax'] and not s['pending']
+    assert s['historyScroll'] == manual and s['historyAnimating'] and not s['pending']
+    target = s['historyMax']
+    feed.call('OnUpdate', 0.25)
+    assert abs(s['historyScroll'] - (manual + target) / 2) <= 1
+    feed.call('OnUpdate', 0.25)
+    assert s['historyScroll'] == target and not s['historyAnimating']
     # Same prose and IDs can be a valid self loop. It must append exactly once.
     feed.call('OnMouseMove', 20, s['answerTop'] + 1)
     assert s['selected'] == 0
@@ -205,6 +210,90 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
     assert 0 <= s['answerScroll'] <= s['answerMax']
     fresh = Feed(width, height)
     assert fresh.state['rows'] == [] and fresh.state['historyScroll'] == 0
+    # Automatic history motion takes half a second independent of frame rate.
+    for fps in (30, 60, 144):
+        animated = Feed(width, height)
+        animated.call('ChooseNumber', 0)
+        animated.line = 'New long NPC reply ' * 200
+        animated.call('OnUpdate', 1 / fps)
+        a = animated.state
+        assert a['historyScroll'] == 0 and a['historyAnimating']
+        previous = 0
+        for frame in range(int(fps / 2) - 1):
+            animated.call('OnUpdate', 1 / fps)
+            assert previous <= a['historyScroll'] < a['historyMax']
+            previous = a['historyScroll']
+        animated.call('OnUpdate', 1 / fps + 0.000001)
+        assert a['historyScroll'] == a['historyMax'] and not a['historyAnimating']
+
+    def begin_scroll():
+        moving = Feed(width, height)
+        moving.call('ChooseNumber', 0)
+        moving.line = 'Overflow NPC reply ' * 200
+        moving.call('OnUpdate', 0.016)
+        moving.call('OnUpdate', 0.125)
+        assert moving.state['historyAnimating']
+        return moving
+
+    moving = begin_scroll()
+    moving.call('OnMouseWheel', 20, 10, 1)
+    stopped = moving.state['historyScroll']
+    moving.call('OnUpdate', 1.0)
+    assert moving.state['historyScroll'] == stopped and not moving.state['historyAnimating']
+    moving = begin_scroll()
+    moving.call('OnLButtonDown', width - 5, 10)
+    stopped = moving.state['historyScroll']
+    moving.call('OnUpdate', 0.5)
+    assert moving.state['historyScroll'] == stopped and not moving.state['historyAnimating']
+    moving.call('OnLButtonUp', width - 5, 10)
+
+    moving = begin_scroll()
+    stopped = moving.state['historyScroll']
+    moving.call('ChooseNumber', 0)
+    moving.call('OnDraw')
+    assert moving.state['historyScroll'] == stopped
+    moving.call('OnUpdate', 0.016)
+    assert moving.state['historyScroll'] == stopped and moving.state['historyAnimating']
+    moving.call('OnUpdate', 0.0)
+    moving.call('OnUpdate', -0.1)
+    assert moving.state['historyScroll'] == stopped
+    moving.call('OnUIMessage', 4101, 'photo', None)
+    moving.call('OnUpdate', 1.0)
+    assert moving.state['historyScroll'] == stopped
+    moving.call('OnUIMessage', 4101, 'photo', None)
+    moving.call('OnUpdate', 1.0)
+    assert moving.state['historyScroll'] == moving.state['historyMax']
+    assert not moving.state['historyAnimating']
+
+    fitting = Feed(width, height)
+    fitting.call('ChooseNumber', 0)
+    fitting.call('OnUpdate', 0.016)
+    assert fitting.state['historyMax'] == 0 and not fitting.state['historyAnimating']
+    # The actor may publish its new line after the first UI update, including
+    # between update and draw. Refresh must not snap a running scroll to the end.
+    for refresh_event in ('OnDraw', 'OnMouseMove', 'OnUpdate'):
+        delayed = begin_scroll()
+        position = delayed.state['historyScroll']
+        delayed.line = 'Delayed NPC reply ' * 300
+        event_args = {'OnDraw': (), 'OnMouseMove': (20, 10), 'OnUpdate': (0.0,)}
+        delayed.call(refresh_event, *event_args[refresh_event])
+        assert delayed.state['historyScroll'] == position
+        assert delayed.state['historyAnimating']
+        delayed.call('OnUpdate', 0.25)
+        assert position < delayed.state['historyScroll'] < delayed.state['historyMax']
+        delayed.call('OnUpdate', 0.25)
+        assert delayed.state['historyScroll'] == delayed.state['historyMax']
+    delayed = Feed(width, height)
+    delayed.call('ChooseNumber', 0)
+    delayed.call('OnUpdate', 0.016)
+    assert not delayed.state['historyAnimating']
+    delayed.line = 'First delayed overflowing reply ' * 200
+    delayed.call('OnDraw')
+    assert delayed.state['historyScroll'] == 0 and delayed.state['historyAnimating']
+    delayed.call('OnUpdate', 0.25)
+    assert 0 < delayed.state['historyScroll'] < delayed.state['historyMax']
+    delayed.call('OnUpdate', 0.25)
+    assert delayed.state['historyScroll'] == delayed.state['historyMax']
     # All three viewports use a fixed round marker and reach both range ends.
     for viewport in (1, 12, 80, height):
         for maximum in (1, 100, 50000):
@@ -379,6 +468,10 @@ for screen_w, screen_h, panel_x, panel_y, panel_w, panel_h in SIZES:
 
 report = {'status': 'PASS', 'viewports': checks,
           'checks': ['manual scroll retention', 'new-line autoscroll', 'pending frame stability',
+                     'half-second smooth scroll at 30/60/144 FPS', 'manual wheel and drag cancel animation',
+                     'rapid choice retargets from current position', 'animation pauses in character info',
+                     'no animation without overflow', 'nonpositive delta and long frame handling',
+                     'delayed actor revision during draw/input/update', 'delayed first overflow',
                      'duplicate input guard', 'identical branch self loop', 'hover and click IDs',
                      'HD key phases', 'dynamic answers and overflow', 'drag capture/release',
                      'draw clip bounds', 'fresh session state', 'number/mouse ID parity',
