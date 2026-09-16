@@ -18,6 +18,10 @@ int main() {
         SelectLayout("dialog.xml", 0, 0) || SelectLayout("dialog.xml", 1920, 1200))
         return 3;
 
+    if (LayoutLeftFraction(800, 600) != 424.0f / 800 ||
+        LayoutLeftFraction(1024, 768) != 543.0f / 1024 || LayoutLeftFraction(1280, 720) != 0)
+        return 4;
+
     std::puts("Supported sizes, unsupported sizes and unrelated windows: PASS");
     return 0;
 }

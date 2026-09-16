@@ -4,7 +4,9 @@ A dialogue UI mod for **Pathologic Classic HD**, inspired by Disco Elysium.
 
 Keys `1`?`5` select the corresponding reply.
 
-Conversations appear in a scrolling panel on the right, with replies below and an interactive character portrait. Supports 1920x1080, 1600x900, and 1366x768.
+Conversations appear in a scrolling panel on the right, with replies below and an interactive character portrait. Supports 1920x1080, 1600x900, 1366x768, and the 4:3 resolutions 1024x768 and 800x600. The 4:3 layouts keep text and portraits proportional to screen height, with a wider relative panel and matching camera framing.
+
+Layout selection uses the physical client size of the current process's main `PlagueCityClass` window. Debug consoles and auxiliary windows are ignored, so launcher logging can remain enabled. The size is checked again when needed to handle resolution changes; unsupported sizes retain the vanilla dialogue UI.
 
 NPC speech continues while you select replies and advance through dialogue immediately. If that reply requests a replacement speech while the preserved line is still playing, the replacement is skipped. Unloading the NPC and other non-reply events retain their normal speech cleanup.
 

@@ -1,5 +1,6 @@
 #include "OynonToolsApi.h"
 #include "dialog_policy.h"
+#include "game_window.h"
 #include "layout_selection.h"
 #include <cstring>
 #include <cstdio>
@@ -22,29 +23,8 @@ void Trace(const char* text) {
     }
 }
 
-struct ClientSize {
-    int width = 0;
-    int height = 0;
-    int candidates = 0;
-};
-
-BOOL CALLBACK FindGameWindow(HWND window, LPARAM data) {
-    DWORD process = 0;
-    ::GetWindowThreadProcessId(window, &process);
-    if (process != ::GetCurrentProcessId() || !::IsWindowVisible(window) || ::IsIconic(window) ||
-        ::GetWindow(window, GW_OWNER))
-        return TRUE;
-
-    RECT rect{};
-    if (!::GetClientRect(window, &rect) || rect.right <= 0 || rect.bottom <= 0)
-        return TRUE;
-
-    auto& size = *reinterpret_cast<ClientSize*>(data);
-    ++size.candidates;
-    size.width = rect.right;
-    size.height = rect.bottom;
-    return TRUE;
-}
+using disco_dialogues::ClientSize;
+using disco_dialogues::FindGameWindow;
 
 const char* CurrentLayout(ClientSize& size) {
     if (!runtimeReady.load(std::memory_order_acquire))
@@ -201,8 +181,7 @@ float ResolveDialogLayoutFraction() {
     if (!CurrentLayout(size))
         return 0.0f;
 
-    const float left = size.width == 1920 ? 1243.0f : size.width == 1600 ? 1036.0f : 885.0f;
-    return left / static_cast<float>(size.width);
+    return LayoutLeftFraction(size.width, size.height);
 }
 }
 

@@ -1,0 +1,19 @@
+<form name="disco_dialogues_800x600" x="0" y="0" w="800" h="600" script="ui_dialog.bin">
+  <form name="panel" x="424" y="13" w="363" h="574" script="disco_dialogues_panel.bin">
+    <image name="default" x="0.75" y="0.0625" w="0.03125" h="0.0625">ui/disco_dialogues_accents.tga</image>
+    <image name="panel_edge" x="0.75" y="0.5" w="0.03125" h="0.0625">ui/disco_dialogues_accents.tga</image>
+    <form name="photo" x="437" y="26" w="97" h="80" script="disco_dialogues_photo.bin" />
+    <form name="name" x="547" y="26" w="226" h="80" script="disco_dialogues_title.bin">
+      <font name="default" size="14" face="fritz_quadrata" />
+    </form>
+    <form name="dialog_text" x="437" y="117" w="336" h="456" script="disco_dialogues_feed.bin">
+      <font name="default" size="12" face="fritz_quadrata" />
+      <sound name="disco-dialogs-action" stream="0" loop="0">disco-dialogs-action.ogg</sound>
+      <image name="feed_thumb" x="0" y="0" w="0.5" h="1">ui/disco_dialogues_accents.tga</image>
+      <image name="feed_track" x="0.75" y="0.5" w="0.03125" h="0.0625">ui/disco_dialogues_accents.tga</image>
+    </form>
+  </form>
+  <cursor name="default" script="ui_cursor.bin" w="32" h="32">
+    <image name="default" x="0" y="0" w="1" h="1">ui/ui_cursor.tga</image>
+  </cursor>
+</form>

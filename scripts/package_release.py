@@ -8,7 +8,7 @@ import zipfile
 import shutil
 from pathlib import Path
 import xml.etree.ElementTree as ET
-from generate_layouts import ROOT, SIZES, read_vfs, make_layout, validate, forms, rect, accent_texture
+from generate_layouts import ROOT, SIZES, read_vfs, make_layout, validate, forms, rect, accent_texture, stock_layout_name
 
 
 def assert_x86_dll(data):
@@ -41,14 +41,14 @@ def main():
     custom_scripts = {f'disco_dialogues_{part}.bin' for part in ('feed', 'panel', 'photo', 'title')}
     for name in custom_scripts:
         files['data/Scripts/' + name] = ROOT / 'resources/scripts' / name
-    originals = read_vfs(args.game_root / 'data/UI.vfs', [f'dialog_{w}x{h}.xml' for w, h, *_ in SIZES])
+    originals = read_vfs(args.game_root / 'data/UI.vfs', [stock_layout_name(w, h) for w, h, *_ in SIZES])
     scripts = set()
     for size in SIZES:
         w, h, *_ = size
         name = f'disco_dialogues_{w}x{h}.xml'
         source = ROOT / 'resources/ui' / name
         generated = ET.parse(source).getroot()
-        original = ET.fromstring(originals[f'dialog_{w}x{h}.xml'])
+        original = ET.fromstring(originals[stock_layout_name(w, h)])
         validate(original, generated, size)
         expected = forms(make_layout(original, size))
         if any(rect(node) != rect(expected[path]) for path, node in forms(generated).items()):
@@ -89,14 +89,14 @@ def main():
             archive.writestr(name, data)
     with zipfile.ZipFile(zip_path) as archive:
         assert archive.testzip() is None
-        assert set(archive.namelist()) == set(files) and len(archive.namelist()) == 14
+        assert set(archive.namelist()) == set(files) and len(archive.namelist()) == 16
         for name, data in payload.items():
             assert archive.read(name) == data
     report = {
         'package': zip_path.name,
         'sha256': hashlib.sha256(zip_path.read_bytes()).hexdigest(),
         'checks': ['PE32 x86 DLLs', 'XML contracts and bounds', 'vanilla script references exist',
-                   'exact 14-file allowlist', 'ZIP CRC and payload byte equality', 'shared DLL install hints',
+                   'exact 16-file allowlist', 'ZIP CRC and payload byte equality', 'shared DLL install hints',
                    'shared dialog gate exports', 'runtime adapter exports'],
         'gameplay_validation': 'NOT RUN; static and isolated tests only',
         'files': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(payload.items())},
@@ -115,7 +115,7 @@ def main():
     report['compatibility'] = {name: hashlib.sha256((compatibility / name).read_bytes()).hexdigest()
                                for name in ('InventoryOverhaul.dll', 'OynonTools.dll')}
     (release / 'validation.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-    print(f'PASS: {zip_path} (14 entries; {len(scripts)} unchanged stock script references; four custom UI BINs); matching compatibility DLLs')
+    print(f'PASS: {zip_path} (16 entries; {len(scripts)} unchanged stock script references; four custom UI BINs); matching compatibility DLLs')
 
 
 if __name__ == '__main__':

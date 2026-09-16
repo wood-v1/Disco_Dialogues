@@ -11,7 +11,14 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 SIZES = [(1920, 1080, 1243, 24, 653, 1032),
          (1600, 900, 1036, 20, 544, 860),
-         (1366, 768, 885, 17, 464, 734)]
+         (1366, 768, 885, 17, 464, 734),
+         (1024, 768, 543, 17, 464, 734),
+         (800, 600, 424, 13, 363, 574)]
+
+
+def stock_layout_name(width, height):
+    # The base 800x600 layout has no resolution suffix in UI.vfs.
+    return "dialog.xml" if (width, height) == (800, 600) else f"dialog_{width}x{height}.xml"
 
 
 def accent_texture():
@@ -162,7 +169,7 @@ def main():
     else:
         texture.parent.mkdir(parents=True, exist_ok=True)
         texture.write_bytes(accent_texture())
-    names = [f"dialog_{s[0]}x{s[1]}.xml" for s in SIZES]
+    names = [stock_layout_name(s[0], s[1]) for s in SIZES]
     originals = read_vfs(args.game_root / "data/UI.vfs", names)
     output = ROOT / "resources/ui"
     output.mkdir(parents=True, exist_ok=True)
@@ -175,7 +182,7 @@ def main():
         generated = make_layout(original, size)
         ET.indent(generated, space="  ")
         data = ET.tostring(generated, encoding="utf-8") + b"\n"
-        path = output / name.replace("dialog_", "disco_dialogues_", 1)
+        path = output / f"disco_dialogues_{size[0]}x{size[1]}.xml"
         if args.check:
             if path.read_bytes() != data:
                 raise ValueError(f"Generated file is stale: {path}")
@@ -196,7 +203,7 @@ def main():
         (ROOT / "docs").mkdir(exist_ok=True)
         (ROOT / "docs/GEOMETRY.md").write_text("\n".join(report), encoding="utf-8")
         (ROOT / "docs/original-layout-hashes.json").write_text(json.dumps(hashes, indent=2) + "\n", encoding="utf-8")
-    print("PASS: three layouts; native widget contracts; screen/column bounds; unified feed; no legacy frames; deterministic output")
+    print("PASS: five layouts; native widget contracts; screen/column bounds; unified feed; no legacy frames; deterministic output")
 
 
 if __name__ == "__main__":
