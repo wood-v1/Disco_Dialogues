@@ -153,7 +153,7 @@ DWORD WINAPI Initialize(void* parameter) {
         return 1;
     }
 
-    Trace("Disco Dialogues 1.0.0 initialized");
+    Trace("Disco Dialogues 1.0.1 initialized");
     runtimeReady.store(true, std::memory_order_release);
 
     for (;;) {

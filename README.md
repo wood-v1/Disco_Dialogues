@@ -1,4 +1,4 @@
-# Disco Dialogues 1.0
+# Disco Dialogues 1.0.1
 
 A dialogue UI mod for **Pathologic Classic HD**, inspired by Disco Elysium.
 
@@ -34,10 +34,20 @@ Place the dependency repositories beside this project. CMake builds OynonTools f
 ./build-release.ps1 -GameRoot '<game folder>'
 ```
 
+To validate both editions during packaging, also pass `-CompatibilityGameRoots '<other edition folder>'`.
+The ABI checks run the actual hook installers against relocated copies of each installation's PE files,
+check rejection of unknown builds, altered instructions and occupied slots, and execute native speech fixtures.
+Reports are written separately as `release/abi-validation-steam.json` and `release/abi-validation-gog.json`.
+
 The mod ZIP is written to `release/`.
 
 Generic runtime adapters and ABI tests live in OynonTools; dialogue behaviour and its tests live in this mod. See [the library boundary and API](HOOK_EXTRACTION.md) for ownership, callback lifetime and remaining limitations.
 
 ## Compatibility
 
-Targets the Steam version of Pathologic Classic HD. The original 2005 release is not supported. In-game validation is still pending.
+Supports the verified Steam and GOG builds of Pathologic Classic HD using the same mod package.
+Game.exe is selected by PE timestamp and image size: Steam `0x5698d115 / 0x4c4000`,
+GOG `0x569d011a / 0x4c5000`. Camera and speech hooks use edition-specific addresses;
+UI, Engine and Sound retain byte and vtable checks for both known DLL builds.
+Unknown builds are rejected. The original 2005 release is not supported.
+Automated ABI and hook-installation checks pass for both editions; interactive in-game validation is still pending.

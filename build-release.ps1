@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)][string]$GameRoot,
     [string]$OynonToolsRoot = (Join-Path $PSScriptRoot '..\OynonTools'),
     [string]$LuaCompilerRoot = (Join-Path $PSScriptRoot '..\pathologic_lua_compiler'),
-    [string]$PathologicReRoot = (Join-Path $PSScriptRoot '..\pathologic_re')
+    [string]$PathologicReRoot = (Join-Path $PSScriptRoot '..\pathologic_re'),
+    [string[]]$CompatibilityGameRoots = @()
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -34,7 +35,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Inventory compatibility configure failed' }
 if ($LASTEXITCODE -ne 0) { throw 'Inventory compatibility build failed' }
 & ctest --test-dir $build -C Release --output-on-failure
 if ($LASTEXITCODE -ne 0) { throw 'Native tests failed' }
-& python (Join-Path $PSScriptRoot 'tests\verify_hd_abi.py') --game-root $GameRoot --pathologic-re $PathologicReRoot --oynon-root $OynonToolsRoot
-if ($LASTEXITCODE -ne 0) { throw 'HD ABI validation failed' }
+foreach ($validationRoot in (@($GameRoot) + $CompatibilityGameRoots | Select-Object -Unique)) {
+    & python (Join-Path $PSScriptRoot 'tests\verify_hd_abi.py') --game-root $validationRoot --pathologic-re $PathologicReRoot --oynon-root $OynonToolsRoot
+    if ($LASTEXITCODE -ne 0) { throw "HD ABI validation failed: $validationRoot" }
+}
 & python (Join-Path $PSScriptRoot 'scripts\package_release.py') --oynon-root $OynonToolsRoot --game-root $GameRoot
 if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }

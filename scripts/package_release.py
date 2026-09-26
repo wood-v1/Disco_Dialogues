@@ -6,6 +6,7 @@ import json
 import struct
 import zipfile
 import shutil
+import re
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from generate_layouts import ROOT, SIZES, read_vfs, make_layout, validate, forms, rect, accent_texture, stock_layout_name
@@ -66,6 +67,19 @@ def main():
     mod_pe = pefile.PE(data=payload['bin/Final/mods/DiscoDialogues.dll'])
     assert all(entry.dll.lower() != b'winmm.dll' for entry in mod_pe.DIRECTORY_ENTRY_IMPORT), 'Separate WinMM player remains linked'
     shared_pe = pefile.PE(data=payload['bin/Final/mods/OynonTools.dll'])
+    shared_version = re.search(r'project\(OynonTools VERSION ([0-9.]+)',
+                               (args.oynon_root / 'CMakeLists.txt').read_text(encoding='utf-8'))[1]
+    version_strings = {key: value for group in shared_pe.FileInfo for info in group
+                       if info.Key == b'StringFileInfo' for table in info.StringTable
+                       for key, value in table.entries.items()}
+    assert version_strings[b'FileVersion'].decode() == shared_version
+    assert version_strings[b'ProductVersion'].decode() == shared_version
+    fixed_version = shared_pe.VS_FIXEDFILEINFO[0]
+    expected_parts = tuple(int(part) for part in shared_version.split('.'))
+    expected_parts += (0,) * (4 - len(expected_parts))
+    for prefix in ('File', 'Product'):
+        ms, ls = (getattr(fixed_version, prefix + 'Version' + suffix) for suffix in ('MS', 'LS'))
+        assert (ms >> 16, ms & 0xffff, ls >> 16, ls & 0xffff) == expected_parts
     exports = {symbol.name for symbol in shared_pe.DIRECTORY_ENTRY_EXPORT.symbols}
     required_exports = {b'OynonUIDialogBlocksItemHotkeys', b'OynonUIDialogInputGeneration'}
     runtime_exports = {b'OynonInstallCameraTransitHook', b'OynonInstallUIExecuteHook',
@@ -83,7 +97,7 @@ def main():
     assert hints['Mods']['LoadOrder'] == 'OynonTools.dll@suspended, DiscoDialogues.dll@ui+3000'
     release = ROOT / 'release'
     release.mkdir(exist_ok=True)
-    zip_path = release / 'Pathologic_Disco_Dialogues_1_0_0.zip'
+    zip_path = release / 'Pathologic_Disco_Dialogues_1_0_1.zip'
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as archive:
         for name, data in sorted(payload.items()):
             archive.writestr(name, data)
@@ -94,10 +108,11 @@ def main():
             assert archive.read(name) == data
     report = {
         'package': zip_path.name,
+        'oynontools_version': shared_version,
         'sha256': hashlib.sha256(zip_path.read_bytes()).hexdigest(),
         'checks': ['PE32 x86 DLLs', 'XML contracts and bounds', 'vanilla script references exist',
                    'exact 16-file allowlist', 'ZIP CRC and payload byte equality', 'shared DLL install hints',
-                   'shared dialog gate exports', 'runtime adapter exports'],
+                   'shared dialog gate exports', 'runtime adapter exports', 'DLL file and product versions'],
         'gameplay_validation': 'NOT RUN; static and isolated tests only',
         'files': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(payload.items())},
         'vanilla_script_hashes': {name: hashlib.sha256(data).hexdigest() for name, data in script_data.items()},

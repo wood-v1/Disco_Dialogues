@@ -18,8 +18,25 @@ def main():
     parser.add_argument('--game-root', type=Path, required=True)
     parser.add_argument('--pathologic-re', type=Path, required=True)
     parser.add_argument('--oynon-root', type=Path, default=ROOT.parent / 'OynonTools')
+    parser.add_argument('--build-dir', type=Path, default=ROOT / 'build-win32')
     args = parser.parse_args()
     import pefile
+    game_pe = pefile.PE(str(args.game_root / 'bin/Final/Game.exe'))
+    gog = game_pe.FILE_HEADER.TimeDateStamp == 0x569d011a
+    edition = 'gog' if gog else 'steam'
+    # Explicit independently checked Game.exe addresses; never apply a blanket delta.
+    gog_rvas = {
+        0x216eb8: 0x216f18, 0x216ee8: 0x216f48, 0x217281: 0x2172e1,
+        0x37ba44: 0x37ca44, 0x23d21: 0x23d17,
+        0x36af60: 0x36bf60, 0x243d4: 0x243cf,
+        0x36af30: 0x36bf30, 0x2133c: 0x21332,
+        0x371c44: 0x372c44, 0x18b65: 0x18b3d,
+        0x37cc40: 0x37dd38, 0x1ac9e: 0x1ac76,
+        0x371cdc: 0x372cdc, 0x153190: 0x1531f0, 0x152c80: 0x152ce0,
+        0x151150: 0x1511b0, 0x26ae30: 0x26b390,
+    }
+    def game_rva(value):
+        return gog_rvas[value] if gog else value
     modules = {}
     for name, stamp, size in [('Game.exe', 0x5698d115, 0x4c4000),
                               ('Engine.dll', 0x561b8394, 0x26e000),
@@ -27,9 +44,17 @@ def main():
                               ('Sound.dll', 0x565374bc, 0xc6000)]:
         path = args.game_root / 'bin/Final' / name
         pe = pefile.PE(str(path))
-        assert pe.FILE_HEADER.TimeDateStamp == stamp
-        assert pe.OPTIONAL_HEADER.SizeOfImage == size
+        if gog:
+            stamp = {'Game.exe': 0x569d011a, 'Engine.dll': 0x569d0040,
+                     'UI.dll': 0x569d000c, 'Sound.dll': 0x569d000b}[name]
+            if name == 'Game.exe':
+                size = 0x4c5000
+        assert pe.FILE_HEADER.TimeDateStamp == stamp, (name, edition, 'timestamp')
+        assert pe.OPTIONAL_HEADER.SizeOfImage == size, (name, edition, 'image size')
         modules[name] = (pe.OPTIONAL_HEADER.ImageBase, pe.get_memory_mapped_image())
+    for hook in ('camera', 'ui_execute', 'script_audio'):
+        subprocess.run([str(args.build_dir / 'Release' / f'hd_{hook}_install_test.exe'),
+                        str(args.game_root / 'bin/Final')], check=True)
     checked = 0
     # Presentation contracts used by the UI scripts. StretchBlit's optional
     # sixth argument is a float alpha passed to this image's draw, not a window
@@ -49,13 +74,21 @@ def main():
         ('Sound.dll', 0x3e017, '7f0d807e680074078bcee8dac5ffff'),
         ('Sound.dll', 0x3a638, '50ff1594f10810'),
     ]:
+        if module == 'Game.exe':
+            offset = game_rva(offset)
         expected = bytes.fromhex(encoded)
         assert modules[module][1][offset:offset+len(expected)] == expected, (module, hex(offset))
         checked += 1
     for source in ['camera_hook.cpp', 'ui_execute_hook.cpp', 'script_audio_hooks.cpp']:
         text = (args.oynon_root / 'src/runtime' / source).read_text(encoding='utf-8')
-        for symbol, address, encoded, length in re.findall(
-                r'hd::Bytes\((g|e|ui|s), (0x[0-9a-f]+), "([^"]+)", (\d+)\)', text):
+        # Select the same explicit edition branches as the C++ adapter.
+        text = re.sub(r'\(gog \? (0x[0-9a-f]+|"[^"]+") : (0x[0-9a-f]+|"[^"]+")\)',
+                      lambda m: m[1] if gog else m[2], text)
+        guards = re.findall(
+                r'hd::Bytes\((g|e|ui|s), (0x[0-9a-f]+), "([^"]+)", (\d+)\)', text)
+        assert len(guards) == {'camera_hook.cpp': 11, 'ui_execute_hook.cpp': 6,
+                               'script_audio_hooks.cpp': 23}[source], source
+        for symbol, address, encoded, length in guards:
             module = {'g': 'Game.exe', 'e': 'Engine.dll', 'ui': 'UI.dll', 's': 'Sound.dll'}[symbol]
             expected = bytes.fromhex(encoded.replace('\\x', ''))
             assert len(expected) == int(length)
@@ -76,6 +109,8 @@ def main():
                                   ('Sound.dll', 0x8f994, 0x2a120),
                                   ('Sound.dll', 0x8f8ec, 0x28970)]:
         base, image = modules[module]
+        if module == 'Game.exe':
+            slot, target = game_rva(slot), game_rva(target)
         assert struct.unpack_from('<I', image, slot)[0] == base + target
     # Verify the HD vector setter/getter slots used by the scoped target edit.
     base, image = modules['Engine.dll']
@@ -85,30 +120,32 @@ def main():
     # Verify both the real constructor's import getter call and base vtable.
     base, image = modules['Game.exe']
     def target(slot):
-        rva = struct.unpack_from('<I', image, 0x371cdc+slot*4)[0] - base
+        rva = struct.unpack_from('<I', image, game_rva(0x371cdc)+slot*4)[0] - base
         if image[rva] == 0xe9:
             rva += 5 + struct.unpack_from('<i', image, rva+1)[0]
         return rva
-    assert target(9) == 0x153190  # SetViewFOV(float), ends with ret 4.
-    assert image[0x153190:0x15319e] == bytes.fromhex('f30f10442404f30f114124c20400')
-    assert target(10) == 0x152c80  # GetImportFOV -> virtual GetViewFOV.
-    assert image[0x152c80:0x152c88] == bytes.fromhex('8b018b4020ffe0cc')
+    assert target(9) == game_rva(0x153190)  # SetViewFOV(float), ends with ret 4.
+    assert image[game_rva(0x153190):game_rva(0x153190)+14] == bytes.fromhex('f30f10442404f30f114124c20400')
+    assert target(10) == game_rva(0x152c80)  # GetImportFOV -> virtual GetViewFOV.
+    assert image[game_rva(0x152c80):game_rva(0x152c80)+8] == bytes.fromhex('8b018b4020ffe0cc')
     header = (args.oynon_root / 'src/runtime/camera_abi.h').read_text(encoding='utf-8')
     assert '>(camera, 10)(camera)' in header
 
     sys.path.insert(0, str(args.pathologic_re / 'parser/lib'))
     import PathologicScript as PS
     PS.IS_ALPHA = False
-    directory = ROOT / 'tmp/camera-fixtures'
+    directory = ROOT / 'tmp/camera-fixtures' / edition
     directory.mkdir(parents=True, exist_ok=True)
     # Exercise native controller and task getters with the real hook tests.
     # Both bodies contain only local branches and indirect virtual calls.
     image = modules['Game.exe'][1]
-    assert image[0x1ac9e:0x1aca3] == bytes.fromhex('e98d012500')
+    thunk = game_rva(0x1ac9e)
+    assert image[thunk] == 0xe9
+    assert thunk + 5 + struct.unpack_from('<i', image, thunk+1)[0] == game_rva(0x26ae30)
     getter_path = directory / 'speech-getters.bin'
-    getter_path.write_bytes(image[0x151150:0x15116f] + image[0x26ae30:0x26ae34] +
+    getter_path.write_bytes(image[game_rva(0x151150):game_rva(0x151150)+31] + image[game_rva(0x26ae30):game_rva(0x26ae30)+4] +
                            modules['Engine.dll'][1][0xbfbe0:0xbfc35])
-    subprocess.run([str(ROOT / 'build-win32/Release/dialog_speech_test.exe'), str(getter_path)], check=True)
+    subprocess.run([str(args.build_dir / 'Release/dialog_speech_test.exe'), str(getter_path)], check=True)
     expected_counts = {'arena_manager.bin': 1, 'citizen_boy.bin': 2,
                        'citizen_worker.bin': 1, 'citizen_girl.bin': 2}
     names = list(expected_counts)
@@ -130,7 +167,7 @@ def main():
                           'sha256': hashlib.sha256(data).hexdigest()})
     fixture_path = directory / 'calls.txt'
     fixture_path.write_text('\n'.join(fixtures)+'\n', encoding='ascii')
-    subprocess.run([str(ROOT / 'build-win32/Release/camera_transition_test.exe'), str(fixture_path)], check=True)
+    subprocess.run([str(args.build_dir / 'Release/camera_transition_test.exe'), str(fixture_path)], check=True)
     # Validate the actual stock reply path, rather than assuming an audio/UI
     # relationship from names. Both NPCs call StopSpeech before branch actions.
     speech_sites = []
@@ -148,13 +185,14 @@ def main():
             helper = int(call[1], 16)
             assert ops[helper + 4] == '@ lshStopSpeech()', (name, event, helper)
         speech_sites.append({'script': name, 'reply_handlers': len(events), 'sha256': hashlib.sha256(data).hexdigest()})
-    report = {'status': 'PASS', 'guard_byte_sequences': checked, 'vtable_slots': 16,
+    report = {'status': 'PASS', 'edition': edition, 'guard_byte_sequences': checked, 'vtable_slots': 16,
+              'hook_installers': 'All three installers exercised against relocated real PEs, including rejection checks',
               'native_speech_getters': 'Executed installed HD getter bodies with controller/task fixtures',
               'native_exit_resume': 'Executed installed Engine.dll ResumeWithFlags; reproduced voice restart and verified guarded exit',
               'real_camera_call_sites': sites,
               'real_speech_reply_sites': speech_sites,
               'limitation': 'Static ABI and call-site checks; not a game runtime test'}
-    (ROOT / 'release/abi-validation.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
+    (ROOT / f'release/abi-validation-{edition}.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
     print(f'PASS: {checked} ABI byte guards, 16 vtable slots and {len(sites)} real camera call sites; native speech getters and exit resume executed')
 
 

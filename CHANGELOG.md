@@ -4,6 +4,10 @@
 
 - Fix transparent dialogue backgrounds in non-Russian versions by using a bundled black swatch instead of language-specific stock atlas coordinates at all three supported resolutions.
 
+## 1.0.1
+
+- Added compatibility with the GOG version of the game.
+
 ## 1.0.0
 
 Refactoring rebuild:
