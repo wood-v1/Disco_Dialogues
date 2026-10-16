@@ -52,7 +52,7 @@ def main():
     assert before
     shared = final / 'mods/OynonTools.dll'
     shared_hash = hashlib.sha256(shared.read_bytes()).hexdigest()
-    package = ROOT / 'release/Pathologic_Disco_Dialogues_1_0_0.zip'
+    package = ROOT / 'release/Pathologic_Disco_Dialogues_1_1.zip'
     run('install', '--zip', package, '--name', 'Disco Dialogues', '--dll', 'DiscoDialogues.dll', '--skip-dll', 'OynonTools.dll')
     assert inventory_snapshot() == before
     assert hashlib.sha256(shared.read_bytes()).hexdigest() == shared_hash

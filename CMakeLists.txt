@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(DiscoDialogues VERSION 1.0.1 LANGUAGES CXX)
+project(DiscoDialogues VERSION 1.1.0 LANGUAGES CXX)
 if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "Disco Dialogues requires Windows Win32/x86.")
 endif()

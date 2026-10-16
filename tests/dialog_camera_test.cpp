@@ -16,9 +16,14 @@
 
 namespace disco_dialogues {
 float fraction = 0.65f;
+CameraFramingSettings framingSettings;
 
 float ResolveDialogLayoutFraction() {
     return fraction;
+}
+
+CameraFramingSettings ResolveDialogCameraSettings() {
+    return framingSettings;
 }
 }
 
@@ -70,12 +75,14 @@ struct Op {
 };
 
 bool shifted = false, failNative = false;
+OynonVector3 seenDirection{};
 void* expectedInstance = nullptr;
 void** expectedArgs = nullptr;
 
 bool __fastcall Native(void*, void*, void*& instance, void** args, unsigned count, void* result) {
     CHECK(&instance == &expectedInstance && args == expectedArgs && count >= 2 && result == args);
     const auto var = static_cast<Var*>(args[1]);
+    seenDirection = var->direction;
     CHECK(shifted ? var->direction.x > 0 : var->direction.x == 0);
     if (failNative)
         throw std::runtime_error("transit error");
@@ -141,10 +148,20 @@ int main() {
 
     auto invoke = [&] { return Transit(&self, nullptr, expectedInstance, args, 2, args); };
 
+    CHECK(disco_dialogues::framingSettings.leftAreaPosition == 5 &&
+          disco_dialogues::framingSettings.verticalRotation == 3);
+    disco_dialogues::framingSettings = {50, 0};
     shifted = true;
     CHECK(!invoke());
     CHECK(direction.direction.x == 0 && direction.direction.z == 1 && direction.reads == 1 &&
           direction.writes == 2);
+
+    const OynonVector3 defaultDirection = seenDirection;
+    disco_dialogues::framingSettings = {40, 3};
+    CHECK(!invoke());
+    CHECK(seenDirection.x > defaultDirection.x && seenDirection.y > defaultDirection.y &&
+          direction.direction.x == 0 && direction.direction.y == 0 && direction.direction.z == 1);
+    disco_dialogues::framingSettings = {};
 
     failNative = true;
     try {

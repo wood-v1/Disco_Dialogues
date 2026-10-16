@@ -1,53 +1,54 @@
-# Disco Dialogues 1.0.1
+# Disco Dialogues
 
-A dialogue UI mod for **Pathologic Classic HD**, inspired by Disco Elysium.
+Disco Dialogues gives **Pathologic Classic HD** a new conversation screen inspired by Disco Elysium. Dialogue and replies appear in a scrolling panel on the right, with the character visible on the left. You can click the character portrait to read more about them, and press `1` through `6` to choose a reply.
 
-Keys `1`?`5` select the corresponding reply.
+The mod also lets an NPC finish speaking while you choose and advance replies. If the next reply tries to start another voice line before the current one finishes, that new line may be skipped. Your saves and dialogue choices are unaffected.
 
-Conversations appear in a scrolling panel on the right, with replies below and an interactive character portrait. Supports 1920x1080, 1600x900, 1366x768, and the 4:3 resolutions 1024x768 and 800x600. The 4:3 layouts keep text and portraits proportional to screen height, with a wider relative panel and matching camera framing.
+## Install
 
-Layout selection uses the physical client size of the current process's main `PlagueCityClass` window. Debug consoles and auxiliary windows are ignored, so launcher logging can remain enabled. The size is checked again when needed to handle resolution changes; unsupported sizes retain the vanilla dialogue UI.
+1. Close the game.
+2. Install the mod ZIP with Utopian Launcher. Select `DiscoDialogues.dll` and its required shared dependency, `OynonTools.dll`.
+3. Start the game.
 
-NPC speech continues while you select replies and advance through dialogue immediately. If that reply requests a replacement speech while the preserved line is still playing, the replacement is skipped. Unloading the NPC and other non-reply events retain their normal speech cleanup.
+The new screen supports 1920×1080, 1600×900, 1366×768, 1024×768, and 800×600. At other resolutions, the game uses its original dialogue screen.
 
-The mod prevents the world audio resume on dialogue exit from restarting an unpaused voice. It handles both buffered and streamed HD sounds. Paused sounds still resume normally.
+## Settings
 
-## Installation
+Edit `bin/Final/mods/DiscoDialogues.ini` while the game is closed. Restart the game after changing camera or audio settings.
 
-With the game closed, install the mod ZIP through Utopian Launcher. Select `DiscoDialogues.dll` and its shared dependency, `OynonTools.dll`.
+```ini
+[General]
+Enabled=1
 
-Settings are in `bin/Final/mods/DiscoDialogues.ini`.
+[Camera]
+FrameNPCOnLeft=1
+LeftRotation=5
+TopRotation=3
 
-The sole choice sound is `data/Sounds/disco-dialogs-action.ogg`. Lua calls the engine's `PlaySound("disco-dialogs-action")`, using the sound resource declared in the dialogue XML. There is no separate C++ audio player or bundled decoder. The old `DialogChoiceSoundPath` and `DialogChoiceSoundVolume` INI options are no longer used. Playback lifetime follows the native UI sound system.
+[Audio]
+PreserveNpcSpeech=1
+```
 
-When upgrading from 0.2.8 or earlier, remove the old Disco Dialogues package through the launcher before installing this ZIP so its obsolete sound files are removed.
+- `Enabled=0` turns off the new dialogue screen. Restart the game after changing it.
+- `FrameNPCOnLeft=0` keeps the new screen but leaves the dialogue camera as it is in the game.
+- `LeftRotation` moves the character horizontally. `50` keeps the previous view; smaller values move them left. `0` aims at the left edge of the free area, and negative values can push them partly or fully off screen. Allowed values: **−50 to 50**.
+- `TopRotation` adjusts where the camera looks. Positive numbers look higher; negative numbers look lower. `0` keeps the previous view. Allowed values: **−5 to 5 degrees**.
+- `PreserveNpcSpeech=0` restores the game's original behavior of interrupting NPC speech when you advance a reply.
 
-`[Audio] PreserveNpcSpeech=1` enables this behavior by default; set it to `0` and restart the game to restore vanilla speech interruption. Existing saves and dialogue choices are unchanged.
+The default camera values are `5` and `3`. Set `LeftRotation=50` and `TopRotation=0` for the original framing. Older INI files using `LeftAreaPosition` and `VerticalRotation` still work; the new names take priority if both are present. Values outside the allowed ranges use the nearest limit: for example, `−75` becomes `−50` and `25` degrees becomes `5`. These settings adjust the direction of the dialogue camera; the game still controls its position, distance, and field of view.
 
-## Building
+## Compatibility
 
-Requires CMake, MSVC with x86 tools, Python 3, and the OynonTools, UtopianInventory, pathologic_lua_compiler, and pathologic_re projects. Python dependencies include pefile and those required by the compiler tools.
+The same package supports the verified Steam and GOG versions of **Pathologic Classic HD**. Other game builds and the original 2005 release are not supported. Automated checks cover both supported versions; an in-game visual check of the current camera changes is still pending.
 
-Place the dependency repositories beside this project. CMake builds OynonTools from source with the mod; packaging and the Inventory compatibility build use that same DLL/import library. Then run:
+## Build from source
+
+You need CMake, MSVC with Win32 tools, Python 3, and the `OynonTools`, `UtopianInventory`, `pathologic_lua_compiler`, and `pathologic_re` repositories next to this one. Python also needs `pefile` and the compiler's dependencies.
 
 ```powershell
 ./build-release.ps1 -GameRoot '<game folder>'
 ```
 
-To validate both editions during packaging, also pass `-CompatibilityGameRoots '<other edition folder>'`.
-The ABI checks run the actual hook installers against relocated copies of each installation's PE files,
-check rejection of unknown builds, altered instructions and occupied slots, and execute native speech fixtures.
-Reports are written separately as `release/abi-validation-steam.json` and `release/abi-validation-gog.json`.
+To check both Steam and GOG game files, add `-CompatibilityGameRoots '<other game folder>'`. The finished ZIP and validation reports go in `release/`.
 
-The mod ZIP is written to `release/`.
-
-Generic runtime adapters and ABI tests live in OynonTools; dialogue behaviour and its tests live in this mod. See [the library boundary and API](HOOK_EXTRACTION.md) for ownership, callback lifetime and remaining limitations.
-
-## Compatibility
-
-Supports the verified Steam and GOG builds of Pathologic Classic HD using the same mod package.
-Game.exe is selected by PE timestamp and image size: Steam `0x5698d115 / 0x4c4000`,
-GOG `0x569d011a / 0x4c5000`. Camera and speech hooks use edition-specific addresses;
-UI, Engine and Sound retain byte and vtable checks for both known DLL builds.
-Unknown builds are rejected. The original 2005 release is not supported.
-Automated ABI and hook-installation checks pass for both editions; interactive in-game validation is still pending.
+For implementation details, see [the runtime integration notes](HOOK_EXTRACTION.md).

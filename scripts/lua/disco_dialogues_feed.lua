@@ -41,6 +41,7 @@ maintask DiscoDialoguesFeed do
   local key3Held: bool
   local key4Held: bool
   local key5Held: bool
+  local key6Held: bool
   local const DIALOGUE: int = 0
   local const CHARACTER_INFO: int = 1
   local const NPC: int = 1
@@ -436,7 +437,7 @@ maintask DiscoDialoguesFeed do
     answerScroll = Clamp(answerScroll, answerMax)
   end
   -- Same HD keyboard/gamepad codes and event phases as the stock answer view.
-  -- HD UI callbacks receive virtual keys (49..53 for the number row).
+  -- HD UI callbacks receive virtual keys (49..54 for the number row).
   -- The binding IDs 201..204 registered at Game.exe RVA 0x216eb8 are a
   -- different namespace; stock gamepad UI handlers also use virtual keys.
   function ChooseNumber(index: int) -> void
@@ -470,6 +471,10 @@ maintask DiscoDialoguesFeed do
       if !key5Held then key5Held = true ChooseNumber(4) end
       return
     end
+    if key == 54 then
+      if !key6Held then key6Held = true ChooseNumber(5) end
+      return
+    end
     if viewMode == CHARACTER_INFO then
       if key == 267 then infoScroll = Clamp(infoScroll - fontHeight, infoMax) end
       if key == 268 then infoScroll = Clamp(infoScroll + fontHeight, infoMax) end
@@ -484,6 +489,7 @@ maintask DiscoDialoguesFeed do
     if key == 51 then key3Held = false return end
     if key == 52 then key4Held = false return end
     if key == 53 then key5Held = false return end
+    if key == 54 then key6Held = false return end
     if viewMode == CHARACTER_INFO then
       if key == 272 then infoScroll = Clamp(infoScroll - fontHeight, infoMax) end
       if key == 274 then infoScroll = Clamp(infoScroll + fontHeight, infoMax) end

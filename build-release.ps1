@@ -1,12 +1,15 @@
 param(
     [Parameter(Mandatory = $true)][string]$GameRoot,
-    [string]$OynonToolsRoot = (Join-Path $PSScriptRoot '..\OynonTools'),
-    [string]$LuaCompilerRoot = (Join-Path $PSScriptRoot '..\pathologic_lua_compiler'),
-    [string]$PathologicReRoot = (Join-Path $PSScriptRoot '..\pathologic_re'),
+    [string]$OynonToolsRoot,
+    [string]$LuaCompilerRoot,
+    [string]$PathologicReRoot,
     [string[]]$CompatibilityGameRoots = @()
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if (-not $OynonToolsRoot) { $OynonToolsRoot = Join-Path $PSScriptRoot '..\OynonTools' }
+if (-not $LuaCompilerRoot) { $LuaCompilerRoot = Join-Path $PSScriptRoot '..\pathologic_lua_compiler' }
+if (-not $PathologicReRoot) { $PathologicReRoot = Join-Path $PSScriptRoot '..\pathologic_re' }
 $build = Join-Path $PSScriptRoot 'build-win32'
 & python (Join-Path $PSScriptRoot 'scripts\prepare_choice_audio.py') --check
 if ($LASTEXITCODE -ne 0) { throw 'Bundled choice audio validation failed' }

@@ -97,7 +97,7 @@ def main():
     assert hints['Mods']['LoadOrder'] == 'OynonTools.dll@suspended, DiscoDialogues.dll@ui+3000'
     release = ROOT / 'release'
     release.mkdir(exist_ok=True)
-    zip_path = release / 'Pathologic_Disco_Dialogues_1_0_1.zip'
+    zip_path = release / 'Pathologic_Disco_Dialogues_1_1.zip'
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as archive:
         for name, data in sorted(payload.items()):
             archive.writestr(name, data)

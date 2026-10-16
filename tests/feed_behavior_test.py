@@ -305,8 +305,8 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
                 assert marker == ('feed_thumb', width-14, 0 if scroll == 0 else viewport-size, 12, size)
 
     # The same IDs must be chosen by a numbered option and a mouse click.
-    replies = [('', 999, 999)] + [(f'Choice {i}', 80+i, 90+i) for i in range(5)]
-    for index in range(5):
+    replies = [('', 999, 999)] + [(f'Choice {i}', 80+i, 90+i) for i in range(6)]
+    for index in range(6):
         keyboard = Feed(width, height, replies=replies)
         mouse = Feed(width, height, replies=replies)
         assert keyboard.state['answers'][index].startswith(f'{index+1}. ')
@@ -325,7 +325,7 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
 
     for replies in [[], [('', 1, 2)], [('Only one', 1, 2)], [('One', 1, 2), ('Two', 3, 4)]]:
         limited = Feed(width, height, replies=replies)
-        for key in (51, 52, 53, 201, 202):  # binding IDs are NOT UI virtual keys
+        for key in (51, 52, 53, 54, 201, 202):  # binding IDs are NOT UI virtual keys
             limited.call('OnKeyDown', key)
         assert not limited.chosen
         assert 'PlaySound' not in limited.native_calls
@@ -365,7 +365,7 @@ for width, height in [(605, 820), (504, 683), (430, 583)]:
     info.call('OnMouseMove', width-5, height-1)
     info.call('OnLButtonUp', width-5, height-1)
     assert info.state['dragging'] == 0 and 0 <= info.state['infoScroll'] <= info.state['infoMax']
-    for key in range(49, 54): info.call('OnKeyDown', key)
+    for key in range(49, 55): info.call('OnKeyDown', key)
     info.call('OnKeyUp', 256)
     info.call('OnLButtonUp', 20, info.state['answerTop']+1)
     info.call('OnUpdate', 0.016)

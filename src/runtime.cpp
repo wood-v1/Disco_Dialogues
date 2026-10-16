@@ -12,6 +12,7 @@ std::wstring iniPath;
 std::wstring uiDirectory;
 bool debugEnabled = false;
 bool cameraEnabled = true;
+disco_dialogues::CameraFramingSettings cameraFramingSettings;
 bool preserveNpcSpeech = true;
 std::atomic<bool> runtimeReady{false};
 
@@ -117,6 +118,12 @@ DWORD WINAPI Initialize(void* parameter) {
 
     debugEnabled = ::GetPrivateProfileIntW(L"Debug", L"Enabled", 0, iniPath.c_str()) != 0;
     cameraEnabled = ::GetPrivateProfileIntW(L"Camera", L"FrameNPCOnLeft", 1, iniPath.c_str()) != 0;
+    // New names take precedence; older INI files continue to work unchanged.
+    const int leftAreaPosition = static_cast<int>(::GetPrivateProfileIntW(L"Camera", L"LeftRotation",
+        ::GetPrivateProfileIntW(L"Camera", L"LeftAreaPosition", 5, iniPath.c_str()), iniPath.c_str()));
+    const int verticalRotation = static_cast<int>(::GetPrivateProfileIntW(L"Camera", L"TopRotation",
+        ::GetPrivateProfileIntW(L"Camera", L"VerticalRotation", 3, iniPath.c_str()), iniPath.c_str()));
+    cameraFramingSettings = disco_dialogues::ClampCameraFramingSettings(leftAreaPosition, verticalRotation);
     preserveNpcSpeech = ::GetPrivateProfileIntW(L"Audio", L"PreserveNpcSpeech", 1, iniPath.c_str()) != 0;
     if (::GetPrivateProfileIntW(L"Debug", L"SpeechTrace", 0, iniPath.c_str()))
         disco_dialogues::InitializeDialogSpeechTrace((iniPath + L".speech.log").c_str());
@@ -153,7 +160,7 @@ DWORD WINAPI Initialize(void* parameter) {
         return 1;
     }
 
-    Trace("Disco Dialogues 1.0.1 initialized");
+    Trace("Disco Dialogues 1.1 initialized");
     runtimeReady.store(true, std::memory_order_release);
 
     for (;;) {
@@ -182,6 +189,10 @@ float ResolveDialogLayoutFraction() {
         return 0.0f;
 
     return LayoutLeftFraction(size.width, size.height);
+}
+
+CameraFramingSettings ResolveDialogCameraSettings() {
+    return cameraFramingSettings;
 }
 }
 

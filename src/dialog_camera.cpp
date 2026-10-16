@@ -35,7 +35,8 @@ BOOL __stdcall Transit(const OynonCameraTransitCall* call, void*) {
         return OynonProceedCameraTransit(call, nullptr);
 
     Vector3 direction{state.direction.x, state.direction.y, state.direction.z};
-    if (!FrameOnLeft(direction, {0.0f, 1.0f, 0.0f}, state.importFov, fraction))
+    if (!FrameOnLeft(direction, {0.0f, 1.0f, 0.0f}, state.importFov, fraction,
+            ResolveDialogCameraSettings()))
         return OynonProceedCameraTransit(call, nullptr);
 
     const OynonVector3 framed{direction.x, direction.y, direction.z};
